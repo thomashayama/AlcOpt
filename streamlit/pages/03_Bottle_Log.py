@@ -30,7 +30,15 @@ if st.session_state.page_state == 0:
 
         if st.form_submit_button('Submit'):
             with conn.session as s:
-                s.execute(f"INSERT INTO tasting VALUES ({mead_id}, '{name}', {rating}, {bold}, {tannic}, {sweet}, {acidic}, {complexity});")
+                s.execute(f"""INSERT INTO tasting VALUES (
+                          {mead_id}, 
+                          '{name}', 
+                          {rating}, 
+                          {bold}, 
+                          {tannic}, 
+                          {sweet}, 
+                          {acidic}, 
+                          {complexity});""")
                 s.commit()
 elif st.session_state.page_state == 1:
     st.markdown("Form Submitted")
