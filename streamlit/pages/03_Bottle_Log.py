@@ -12,33 +12,27 @@ if "page_state" not in st.session_state:
 
 conn.session.execute("""CREATE TABLE IF NOT EXISTS bottle 
                      (
-                        bottle_id int NOT NULL PRIMARY KEY,
-                        bottle_number int,
-                        mead_id
+                        carboy_id int NOT NULL PRIMARY KEY,
+                        bottle_id int,
+                        mead_id int,
+                        bottle_date date
                      )""")
 
 if st.session_state.page_state == 0:
     with st.form("my_form"):
         name = st.text_input("Name")
-        mead_id = st.number_input("Mead ID", value=0, min_value=0, max_value=5, step=1)
-        rating = st.slider("Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        bold = st.slider("Light to Bold", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        tannic = st.slider("Smooth to Tannic", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        sweet = st.slider("Dry to Sweet", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        acidic = st.slider("Soft to Acidic", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        complexity = st.slider("Simple to Complex", value=3.0, min_value=1.0, max_value=5.0, step=.1)
+        col_mead, carboy_carboy = st.columns((1, 1))
+        mead_id = col_mead.number_input("Mead ID", value=0, min_value=0, max_value=8, step=1)
+        carboy_id = carboy_carboy.number_input("Carboy ID", value=0, min_value=0, max_value=5, step=1)
+        date = st.date_input("Bottling Date")
 
         if st.form_submit_button('Submit'):
             with conn.session as s:
                 s.execute(f"""INSERT INTO tasting VALUES (
+                          {carboy_id}, 
                           {mead_id}, 
-                          '{name}', 
-                          {rating}, 
-                          {bold}, 
-                          {tannic}, 
-                          {sweet}, 
-                          {acidic}, 
-                          {complexity});""")
+                          {carboy_id}, 
+                          {date});""")
                 s.commit()
 elif st.session_state.page_state == 1:
     st.markdown("Form Submitted")

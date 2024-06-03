@@ -80,10 +80,13 @@ with tab_calc:
     col1, col2, col3 = st.columns((8, 1, 8))
     honey_sugar = col1.number_input(label="Honey Sugar (g)", value=17)
     col2.markdown("# /")
-    honey_sugar = honey_sugar/col3.number_input(label="(L)", value=0.0147868)
+    honey_sugar = honey_sugar/col3.number_input(label="(L)", value=0.0147868, step=0.00001)
     honey_density = st.number_input(label="Honey Density (g/L)", value=21/0.0147868)
 
-    liquid_sugar = st.number_input(label="Liquid Sugar (g/L)", value=29/0.236588)
+    col1, col2, col3 = st.columns((8, 1, 8))
+    liquid_sugar = col1.number_input(label="Liquid Sugar (g)", value=29)
+    col2.markdown("# /")
+    liquid_sugar = liquid_sugar/col3.number_input(label="(L)", value=0.236588, step=0.00001)
     liquid_density = st.number_input(label="Liquid Density (g/L)", value=1026)
 
     target_abv = st.number_input(label="Target ABV (%)", value=9) # in %

@@ -19,14 +19,6 @@ if "page_state" not in st.session_state:
     st.session_state.page_state = 0
 if "last_data" not in st.session_state:
     st.session_state.last_data = {}
-# if "cur" not in st.session_state:
-#     con = sqlite3.connect("../../data/tasting.db")
-#     cur = con.cursor()
-#     st.session_state.cur = cur
-
-# cur = st.session_state.cur
-# res = cur.execute("CREATE TABLE IF NOT EXISTS tasting (mead_id, name, rating, bold, tannic, sweet, acidic, complexity)")
-# print(res.fetchone())
 
 conn.session.execute("""
                      CREATE TABLE IF NOT EXISTS tasting 
@@ -45,7 +37,7 @@ conn.session.execute("""
 
 if st.session_state.page_state == 0:
     with st.form("Tasting Form"):
-        name = st.text_input("Name", value=st.session_state.last_data.get("name", ""))
+        name = st.text_input("Full Name", value=st.session_state.last_data.get("name", "John Doe"))
         mead_id = st.number_input("Mead ID", value=0, min_value=0, max_value=5, step=1)
         date = st.date_input("Tasting Date")
         rating = st.slider("Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=.1)
@@ -56,20 +48,6 @@ if st.session_state.page_state == 0:
         complexity = st.slider("Simple to Complex", value=3.0, min_value=1.0, max_value=5.0, step=.1)
 
         if st.form_submit_button('Submit'):
-            # st.session_state.df = st.session_state.df.append(
-            #     {
-            #         "mead_id": mead_id,
-            #         "name": name,
-            #         "rating": rating,
-            #         "bold": bold,
-            #         "tannic": tannic,
-            #         "sweet": sweet,
-            #         "acidic": acidic,
-            #         "complexity": complexity
-            #     }, 
-            #     ignore_index=True
-            # )
-            # st.session_state.df.to_csv("../data/tasting.csv")
             # Insert some data with conn.session.
             with conn.session as s:
                 s.execute(f"""INSERT INTO tasting VALUES 
@@ -87,7 +65,3 @@ elif st.session_state.page_state == 1:
         st.session_state.page_state = 0
         st.rerun()
         
-# conn.reset()
-# tasting_table = conn.query("SELECT * FROM tasting;")
-# st.dataframe(tasting_table, use_container_width=True)
-# st.dataframe(st.session_state.df, hide_index=True)
