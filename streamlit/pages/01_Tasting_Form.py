@@ -37,7 +37,7 @@ conn.session.execute("""
 
 if st.session_state.page_state == 0:
     with st.form("Tasting Form"):
-        name = st.text_input("Full Name", value=st.session_state.last_data.get("name", "John Doe"))
+        name = st.text_input("Full Name", placeholder=st.session_state.last_data.get("name", "John Doe"), autocomplete="on")
         mead_id = st.number_input("Mead ID", value=0, min_value=0, max_value=5, step=1)
         date = st.date_input("Tasting Date")
         rating = st.slider("Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=.1)
@@ -58,6 +58,10 @@ if st.session_state.page_state == 0:
             st.session_state.last_data["name"] = name
 
             st.rerun()
+
+    conn.reset()
+    tasting_table = conn.query("SELECT * FROM tasting ORDER BY taste_date DESC;")
+    st.dataframe(tasting_table, use_container_width=True, hide_index=True)
 elif st.session_state.page_state == 1:
     st.markdown("Form Submitted")
 
