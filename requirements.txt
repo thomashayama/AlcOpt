@@ -3,3 +3,6 @@ pandas
 numpy
 mpld3
 matplotlib
+
+# SQL visualization
+eralchemy

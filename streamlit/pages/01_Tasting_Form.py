@@ -2,13 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+# SQL
+from sqlalchemy import create_engine, asc
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy_models import Fermentation, Bottle, Review
+from datetime import datetime
+
 st.set_page_config(
     page_title="Tasting Form",
     page_icon="🍷",
 )
 
-# Create the SQL connection to pets_db as specified in your secrets file.
-conn = st.connection('alcohol_db', type='sql')
+# Create the SQL connection
+# conn = st.connection('alcohol_db', type='sql')
+# Set up the database
+engine = create_engine('sqlite:///wine_mead.db')
+Session = sessionmaker(bind=engine)
 
 if "df" not in st.session_state:
     try:
@@ -20,48 +29,91 @@ if "page_state" not in st.session_state:
 if "last_data" not in st.session_state:
     st.session_state.last_data = {}
 
-conn.session.execute("""
-                     CREATE TABLE IF NOT EXISTS tasting 
-                     (
-                        mead_id int, 
-                        name varchar(255) NOT NULL, 
-                        taste_date date,
-                        rating float(2), 
-                        bold float(2), 
-                        tannic float(2), 
-                        sweet float(2), 
-                        acidic float(2), 
-                        complexity float(2)
-                     )
-                     """)
 
 if st.session_state.page_state == 0:
     with st.form("Tasting Form"):
         name = st.text_input("Full Name", placeholder=st.session_state.last_data.get("name", "John Doe"), autocomplete="on")
-        mead_id = st.number_input("Mead ID", value=0, min_value=0, max_value=5, step=1)
+        bottle_id = st.number_input("Bottle ID", value=0, min_value=0, max_value=5, step=1)
         date = st.date_input("Tasting Date")
-        rating = st.slider("Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        bold = st.slider("Light to Bold", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        tannic = st.slider("Smooth to Tannic", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        sweet = st.slider("Dry to Sweet", value=3.0, min_value=1.0, max_value=5.0, step=.1)
-        acidic = st.slider("Soft to Acidic", value=3.0, min_value=1.0, max_value=5.0, step=.1)
+        overall_rating = st.slider("Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=.1)
+        boldness = st.slider("Light to Bold", value=3.0, min_value=1.0, max_value=5.0, step=.1)
+        tannicity = st.slider("Smooth to Tannic", value=3.0, min_value=1.0, max_value=5.0, step=.1)
+        sweetness = st.slider("Dry to Sweet", value=3.0, min_value=1.0, max_value=5.0, step=.1)
+        acidity = st.slider("Soft to Acidic", value=3.0, min_value=1.0, max_value=5.0, step=.1)
         complexity = st.slider("Simple to Complex", value=3.0, min_value=1.0, max_value=5.0, step=.1)
 
         if st.form_submit_button('Submit'):
-            # Insert some data with conn.session.
-            with conn.session as s:
-                s.execute(f"""INSERT INTO tasting VALUES 
-                        ({mead_id}, '{name}', '{date}', {rating}, {bold}, {tannic}, {sweet}, {acidic}, {complexity});""")
-                s.commit()
-            print(f"Submitted {mead_id}, '{name}', '{date}', {rating}, {bold}, {tannic}, {sweet}, {acidic}, {complexity}")
-            st.session_state.page_state = 1
-            st.session_state.last_data["name"] = name
+            # Open a session
+            session = Session()
 
-            st.rerun()
+            review_date = datetime.now()  # Replace with the actual review_date
 
-    conn.reset()
-    tasting_table = conn.query("SELECT * FROM tasting ORDER BY taste_date DESC;")
-    st.dataframe(tasting_table, use_container_width=True, hide_index=True)
+            bottle = session.query(Bottle).filter_by(id=bottle_id).first()
+
+            if not bottle:
+                st.error(f"No bottle found with id {bottle_id}")
+                session.close()
+            else:
+
+                # Create a new review
+                new_review = Review(
+                    bottle_id=bottle_id,
+                    fermentation_id=bottle.fermentation_id,
+                    overall_rating=overall_rating,
+                    boldness=boldness,
+                    tannicity=tannicity,
+                    sweetness=sweetness,
+                    acidity=acidity,
+                    complexity=complexity,
+                    review_date=date
+                )
+
+                # Add and commit the review to the session
+                session.add(new_review)
+                session.commit()
+                session.close()
+
+                st.success("Review added successfully!")
+                # Insert some data with conn.session.
+                # with conn.session as s:
+                #     s.execute(f"""INSERT INTO tasting VALUES 
+                #             ({mead_id}, '{name}', '{date}', {rating}, {bold}, {tannic}, {sweet}, {acidic}, {complexity});""")
+                #     s.commit()
+                # print(f"Submitted {mead_id}, '{name}', '{date}', {rating}, {bold}, {tannic}, {sweet}, {acidic}, {complexity}")
+                st.session_state.page_state = 1
+                st.session_state.last_data["name"] = name
+
+                st.rerun()
+
+    # conn.reset()
+    # tasting_table = conn.query("SELECT * FROM tasting ORDER BY taste_date DESC;")
+    session = Session()
+    reviews = session.query(Review).order_by(asc(Review.review_date)).all()
+
+    # Convert to a list of dictionaries
+    reviews_list = [
+        {
+            'Bottle ID': review.bottle_id,
+            'Overall Rating': review.overall_rating,
+            'Boldness': review.boldness,
+            'Tannicity': review.tannicity,
+            'Sweetness': review.sweetness,
+            'Acidity': review.acidity,
+            'Complexity': review.complexity,
+            'Review Date': review.review_date
+        }
+        for review in reviews
+    ]
+
+    # Convert list of dictionaries to a DataFrame
+    reviews_df = pd.DataFrame(reviews_list)
+
+    # Display the DataFrame
+    st.dataframe(reviews_df, use_container_width=True, hide_index=True)
+
+    # Close the session
+    session.close()
+    
 elif st.session_state.page_state == 1:
     st.markdown("Form Submitted")
 

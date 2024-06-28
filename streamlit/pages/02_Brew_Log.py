@@ -5,6 +5,11 @@ import cv2
 import numpy as np
 import streamlit as st
 
+# SQL
+from sqlalchemy import create_engine, asc
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy_models import Fermentation, Bottle, Review
+
 st.set_page_config(
     page_title="Mead Tracking",
 )
@@ -28,126 +33,31 @@ def insert_row(conn, table_name, *args, verbose=False):
         s.commit()
 
 # Create the SQL connection to pets_db as specified in your secrets file.
-conn = st.connection('alcohol_db', type='sql')
+# conn = st.connection('alcohol_db', type='sql')
+engine = create_engine('sqlite:///wine_mead.db')
+Session = sessionmaker(bind=engine)
 
 if "page_state" not in st.session_state:
     st.session_state.page_state = 0
 
-# Brew table stores info on each time something is brewed
-conn.session.execute("""CREATE TABLE IF NOT EXISTS brew 
-                     (
-                        brew_id int SERIAL PRIMARY KEY,
-                        ferment_date date,
-                        rack_date date,
-                        bottle_date date,
-                        water_mass float(2), 
-                        other_liquid_name varchar(255),
-                        other_liquid_mass float(2), 
-                        honey_mass float(2),
-                        init_specific_gravity float(4),
-                        final_specific_gravity float(4),
-                        notes varchar(255)
-                     )""")
-
-# Stores a collection of ingredients that were added for each
-conn.session.execute("""CREATE TABLE IF NOT EXISTS action_ingredients 
-                     (
-                        action_id int SERIAL FOREIGN KEY REFERENCES carboy(carboy_id),
-                        carboy_id int NOT NULL FOREIGN KEY REFERENCES carboy(carboy_id), 
-                        mead_id int NOT NULL, 
-                        date_added date NOT NULL,
-                        carboy_state int NOT NULL,
-                        notes varchar(255)
-                     )""")
-
-# Stores carboys
-conn.session.execute("""CREATE TABLE IF NOT EXISTS carboy 
-                     (
-                        carboy_id int SERIAL PRIMARY KEY, 
-                        mead_id int NOT NULL, 
-                        date_added date NOT NULL,
-                        carboy_state int NOT NULL,
-                        notes varchar(255)
-                     )""")
-
-# Stores carboy actions
-# carboy_state:
-# 0 - empty
-# 1 - primary fermentation
-# 2 - secondary fermentation
-# 3 - racked
-
-conn.session.execute("""CREATE TABLE IF NOT EXISTS carboy_actions
-                     (
-                        action_id int SERIAL PRIMARY KEY,
-                        carboy_id int NOT NULL FOREIGN KEY REFERENCES carboy(carboy_id), 
-                        mead_id int NOT NULL, 
-                        date_added date NOT NULL,
-                        carboy_state int NOT NULL,
-                        notes varchar(255)
-                     )""")
-
-conn.session.execute("""CREATE TABLE IF NOT EXISTS ingredients 
-                     (
-                        name varchar(255) NOT NULL PRIMARY KEY,
-                        sugar_content float(4) NOT NULL, 
-                        density float(4),
-                        notes varchar(255)
-                     )""")
-
 tab_new_form, tab_update, tab_calc = st.tabs(["New Form", "Update", "Calculator"])
-with tab_new_form:
-    if st.session_state.page_state == 0:
-        with st.form("Brew Form"):
-            mead_id = st.number_input("Mead ID", value=None, min_value=0, max_value=5, step=1)
-            carboy_id = st.number_input("Carboy ID", value=0, min_value=0, max_value=6, step=1)
-            ferment_date = st.date_input("Fermentation Start")
-            rack_date = st.date_input("Rack Date", value=None)
-            bottle_date = st.date_input("Bottle Date", value=None)
-            water_mass = st.number_input("Water Mass", value=0.0, min_value=0.0)
-            other_liquid_name = st.text_input("Other Liquid Name", value=None)
-            other_liquid_mass = st.number_input("Other Liquid Mass", value=0.0, min_value=0.0)
-            honey_mass = st.number_input("Honey Mass", value=0.0, min_value=0.0)
-            init_specific_gravity = st.number_input("Initial Specific Gravity", value=1.01, min_value=1.0, step=.001)
-            final_specific_gravity = st.number_input("Final Specific Gravity", value=None, min_value=1.0, step=.001)
-            if final_specific_gravity is not None:
-                st.markdown(f"~ABV: {(init_specific_gravity - final_specific_gravity) * 131.25}")
-                final_brix = 143.254 * final_specific_gravity**3 - 648.670 * final_specific_gravity**2 + 1125.805 * final_specific_gravity - 620.389
-                st.markdown(f"~Brix: {final_brix}")
-                st.markdown(f"~RS: {98*final_brix}") 
-                # st.markdown(f"~g/L: {98*final_brix/(water_mass+other_liquid_mass+)}")
-            notes = st.text_input("Additional Notes")
-
-            if st.form_submit_button('Submit'):
-                insert_row(conn, "brew", mead_id, carboy_id, ferment_date, rack_date, bottle_date, water_mass, other_liquid_name, other_liquid_mass, honey_mass, init_specific_gravity, final_specific_gravity, notes)
-    elif st.session_state.page_state == 1:
-        st.markdown("Form Submitted")
-
-        if st.button("Submit Another"):
-            st.session_state.page_state = 0
-            st.rerun()
-
-    conn.reset()
-    brew_table = conn.query("SELECT * FROM brew ORDER BY ferment_date DESC;")
-    st.dataframe(brew_table, use_container_width=True, hide_index=True)
-
 
 with tab_update:
     if st.session_state.page_state == 0:
         # Select Action
-        carboy_state = st.radio("Select Action", options=["Primary Fermentation", "Secondary Fermentation", "Rack/Age", "Bottle", "Empty"], index=0)
+        
 
         if carboy_state == "Primary Fermentation":
-            image = st.camera_input("Show QR code")
-            if image is not None:
-                bytes_data = image.getvalue()
-                cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+            # image = st.camera_input("Show QR code")
+            # if image is not None:
+            #     bytes_data = image.getvalue()
+            #     cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
 
-                detector = cv2.QRCodeDetector()
+            #     detector = cv2.QRCodeDetector()
 
-                data, bbox, straight_qrcode = detector.detectAndDecode(cv2_img)
+            #     data, bbox, straight_qrcode = detector.detectAndDecode(cv2_img)
 
-                st.write(data)
+            #     st.write(data)
 
             col_carboy, col_mead = st.columns((1, 1))
             carboy_id = col_carboy.number_input("Carboy ID", value=0, min_value=0, max_value=6, step=1)
