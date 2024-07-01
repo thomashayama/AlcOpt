@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd 
-import datetime
+from datetime import datetime
 import cv2
 import numpy as np
 import streamlit as st
@@ -8,121 +8,243 @@ import streamlit as st
 # SQL
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy_models import Fermentation, Bottle, Review
+from sqlalchemy_models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog
 
 st.set_page_config(
-    page_title="Mead Tracking",
+    page_title="Brew Tracking",
 )
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []
 
 
-def insert_row(conn, table_name, *args, verbose=False):
-    def process_col_val(col):
-        if col is None:
-            return 'NULL'
-        if isinstance(col, str) or isinstance(col, datetime.date):
-            return f"'{col}'"
-        else:
-            return str(col)
-    columns = ', '.join([process_col_val(col) for col in args])
-    with conn.session as s:
-        sql_command = f"INSERT INTO {table_name} VALUES ({columns});"
-        if verbose: print(sql_command)
-        s.execute(sql_command)
-        s.commit()
+def add_new_ingredient():
+    with st.form("Add New Ingredient"):
+        ingredient_name = st.text_input("New Ingredient Name")
+        sugar_content = st.number_input("Sugar Content (g/L)", value=0.0)
+        ingredient_type = st.radio("Type", ["Liquid", "Solvent", "Solid"])
+        density = st.number_input("Density (kg/L)", value=1.0)
+        price = st.number_input("Price ($)", value=0.00)
+        notes = st.text_input("Additional Notes")
+        if st.form_submit_button('Add'):
+            if ingredient_name is not None and ingredient_name != "":
+                try:
+                    session = Session()
+                    new_ingredient = Ingredient(name=ingredient_name, sugar_content=sugar_content, ingredient_type=ingredient_type, density=density, price=price, notes=notes)
+                    session.add(new_ingredient)
+                    session.commit()
+                    session.close()
+                except Exception as e:
+                    # st.error("Ingredient already in table!!")
+                    st.error(e)
 
-# Create the SQL connection to pets_db as specified in your secrets file.
-# conn = st.connection('alcohol_db', type='sql')
+
+def add_fermentation():
+    with st.form("Add Ingredient"):
+        if st.form_submit_button('Add'):
+            try:
+                session = Session()
+                new_fermentation = Fermentation(start_date=datetime.now(), initial_specific_gravity=1.080)
+                session.add(new_fermentation)
+                session.commit()
+                print("Fermentation added successfully with ID:", new_fermentation.id)
+                session.close()
+                return new_fermentation.id
+            except Exception as e:
+                st.error(f"Error {e}")
+
+
+def add_fermentation_vessel_log(vessel_id, fermentation_id):
+    with st.form("Add Ingredient"):
+        if st.form_submit_button('Add'):
+            try:
+                session = Session()
+                vessel_log = FermentationVesselLog(
+                    fermentation_id=fermentation_id,
+                    vessel_id=vessel_id,
+                    start_date=datetime.now()
+                )
+                session.add(vessel_log)
+                session.commit()
+                print("Fermentation Vessel Log added successfully with ID:", vessel_log.id)
+                session.close()
+                return vessel_log.id
+            except Exception as e:
+                st.error(f"Error {e}")
+
+
+def add_fermentation_ingredient(ingredient_name=None):
+    """Add Ingredient to a fermentation"""
+    with st.form("Add Ingredient"):
+        session = Session()
+        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+        if ingredient_name is None:
+            ingredient_name = st.text_input("Ingredient Name")
+        date = st.date_input("Date")
+        col_start, col_end = st.columns([1, 1])
+        start_amount = col_start.number_input("Starting Amount", value=0.0, min_value=0.0)
+        end_amount = col_end.number_input("Ending Amount", value=0.0, min_value=0.0)
+        amount = end_amount - start_amount
+        unit = st.text_input("Units", "g")
+        if st.form_submit_button('Add'):
+            try:
+                vessel = session.query(Vessel).filter_by(id=vessel_id).first()
+                if vessel is None:
+                    st.error(f"Vessel {vessel_id} not found")
+                else:
+                    fermentation_id = vessel.fermentation_id
+                    if fermentation_id is None:
+                        new_fermentation = Fermentation(start_date=date)
+                        session.add(new_fermentation)
+                        session.commit()
+                        fermentation_id = new_fermentation.id
+                        st.success(f"Created New Fermentation <{fermentation_id}>")
+
+                        vessel_log = FermentationVesselLog(
+                            fermentation_id=fermentation_id,
+                            vessel_id=vessel_id,
+                            start_date=date
+                        )
+                        session.add(vessel_log)
+                        session.commit()
+                        st.success(f"Created New Fermentation Vessel Log <{vessel_log.id}>")
+
+                        # Update the fermentation_id of the vessel
+                        vessel.fermentation_id = fermentation_id
+                        session.commit()
+                        st.success(f"Fermentation ID updated successfully for Vessel ID: {vessel_id}")
+                    ingredient_id = session.query(Ingredient).filter_by(name=ingredient_name).first().id
+                    new_ferm_ingredient = FermentationIngredient(
+                        fermentation_id=fermentation_id, 
+                        ingredient_id=ingredient_id, 
+                        amount=amount, 
+                        unit=unit,
+                        added_at=date)
+                    session.add(new_ferm_ingredient)
+                    session.commit()
+                    st.success(f"Created New Fermentation Ingredient <{new_ferm_ingredient.id}>")
+                    return new_fermentation.id
+            except Exception as e:
+                st.error(f"Error {e}")
+        session.close()
+
+def add_measurement_form():
+    st.title("Add Specific Gravity Measurement")
+
+    with st.form(key='measurement_form'):
+        fermentation_id = st.number_input("Fermentation ID", min_value=1, step=1)
+        measurement_date = st.date_input("Measurement Date", value=datetime.now())
+        specific_gravity = st.number_input("Specific Gravity", value=.999, min_value=0.0, step=0.001, format="%.3f")
+
+        submit_button = st.form_submit_button(label='Add Measurement')
+
+    if submit_button:
+        try:
+            # Add new specific gravity measurement
+            new_measurement = SpecificGravityMeasurement(
+                fermentation_id=fermentation_id,
+                measurement_date=measurement_date,
+                specific_gravity=specific_gravity
+            )
+            session.add(new_measurement)
+            session.commit()
+            st.success(f"Measurement added successfully for Fermentation ID: {fermentation_id}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            session.rollback()
+        finally:
+            session.close()
+
+def rack_form():
+    with st.form(key='rack_form'):
+        col_from, col_to = st.columns((1, 1))
+        from_vessel_id = col_from.number_input("From Vessel ID", value=1, min_value=1, step=1)
+        to_vessel_id = col_to.number_input("To Vessel ID", value=1, min_value=1, step=1)
+        date = st.date_input("Date")
+        submit_button = st.form_submit_button(label='Add Action')
+
+    if submit_button:
+        try:
+            from_vessel = session.query(Vessel).filter_by(id=from_vessel_id).first()
+            to_vessel = session.query(Vessel).filter_by(id=to_vessel_id).first()
+            vessel_log = FermentationVesselLog(
+                fermentation_id=from_vessel.fermentation_id,
+                vessel_id=to_vessel.id,
+                start_date=date
+            )
+            session.add(vessel_log)
+            session.commit()
+            to_vessel.fermentation_id = from_vessel.fermentation_id
+            from_vessel.fermentation_id = None
+            session.commit()
+            st.success(f"Racked from {from_vessel.id} to {to_vessel.id}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+        finally:
+            session.close()
+
+
 engine = create_engine('sqlite:///wine_mead.db')
 Session = sessionmaker(bind=engine)
+session = Session()
 
-if "page_state" not in st.session_state:
-    st.session_state.page_state = 0
+fermentation_ingredients = session.query(FermentationIngredient).all()
+fermentation_ingredients_list = [
+    {
+    "ID": fermentation_ingredient.id,
+    "Amount": fermentation_ingredient.amount,
+    "Unit": fermentation_ingredient.unit,
+    "Date Added": fermentation_ingredient.added_at,
+    "Fermentation ID": fermentation_ingredient.fermentation_id
+    }
+    for fermentation_ingredient in fermentation_ingredients
+]
+fermentation_ingredients = pd.DataFrame(fermentation_ingredients_list)
 
-tab_new_form, tab_update, tab_calc = st.tabs(["New Form", "Update", "Calculator"])
+tab_ingredient, tab_measurement, tab_rack, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Calculator"])
 
-with tab_update:
-    if st.session_state.page_state == 0:
-        # Select Action
-        
+with tab_ingredient:
+    session = Session()
 
-        if carboy_state == "Primary Fermentation":
-            # image = st.camera_input("Show QR code")
-            # if image is not None:
-            #     bytes_data = image.getvalue()
-            #     cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+    # Query and choose ingredient added
+    ingredient_names = [i.name for i in session.query(Ingredient).order_by(asc(Ingredient.name)).all()]
 
-            #     detector = cv2.QRCodeDetector()
+    options = ingredient_names + ["*New Ingredient"]
+    ingredient_name = st.selectbox("Ingredient Added", options=options)
 
-            #     data, bbox, straight_qrcode = detector.detectAndDecode(cv2_img)
+    # Create text input for user entry
+    if ingredient_name == "*New Ingredient": 
+        add_new_ingredient()
+    
+    add_fermentation_ingredient(ingredient_name=ingredient_name)
 
-            #     st.write(data)
+    st.dataframe(fermentation_ingredients[::-1], use_container_width=True, hide_index=True)
 
-            col_carboy, col_mead = st.columns((1, 1))
-            carboy_id = col_carboy.number_input("Carboy ID", value=0, min_value=0, max_value=6, step=1)
-            carboy_history_table = conn.query(f"SELECT * FROM carboy WHERE carboy_id = {carboy_id} ORDER BY date_added;")
-            
-            mead_id = col_mead.number_input("Mead ID", value=None, min_value=0, max_value=5, step=1)
-            
-            # Query and choose ingredient added
-            ingredients_history_table = conn.query(f"SELECT name FROM ingredient")
-            options = list(ingredients_history_table.loc[:, "name"]) + st.session_state.new_ingredients + ["*New Ingredient"]
-            ingredient_name = st.selectbox("Ingredient Added", options=options)
+#             specific_gravity = st.number_input("Specific Gravity", value=1.010, min_value=.990, step=.001)
+#             notes = st.text_input("Brew Notes")
+#             if st.button("Finish"):
+#                 insert_row(conn, "brew", mead_id, carboy_id, date, specific_gravity, notes)
+#         elif carboy_state == "Secondary Fermentation": 
+#             pass
+#         elif carboy_state == "Rack/Age": 
+#             if final_specific_gravity is not None:
+#                 st.markdown(f"~ABV: {(init_specific_gravity - final_specific_gravity) * 131.25}")
+#                 final_brix = 143.254 * final_specific_gravity**3 - 648.670 * final_specific_gravity**2 + 1125.805 * final_specific_gravity - 620.389
+#                 st.markdown(f"~Brix: {final_brix}")
+#                 st.markdown(f"~RS: {98*final_brix}") 
+#                 # st.markdown(f"~g/L: {98*final_brix/(water_mass+other_liquid_mass+)}")
 
-            # Create text input for user entry
-            if ingredient_name == "*New Ingredient": 
-                with st.form("Add New Ingredient"):
-                    ingredient_name = st.text_input("New Ingredient Name")
-                    sugar_content = st.text_input("Sugar Content (g/L)")
-                    density = st.text_input("Density (kg/L)")
-                    notes = st.text_input("Additional Notes")
-                    if st.form_submit_button('Add'):
-                        if ingredient_name is not None and ingredient_name != "":
-                            try:
-                                insert_row(conn, "ingredient", ingredient_name, sugar_content, density, notes)
-                                st.session_state.new_ingredients.append(ingredient_name)
-                            except:
-                                st.error("Ingredient already in table!!")
-            
-            with st.form("Add Ingredient"):
-                date = st.date_input("Date")
-                col_start, col_end = st.columns([1, 1])
-                start_mass = col_start.number_input("Starting Mass", value=0.0, min_value=0.0)
-                end_mass = col_end.number_input("Ending Mass", value=0.0, min_value=0.0)
-                ingredient_mass = end_mass - start_mass
-                notes = st.text_input("Ingredient Add Notes")
+#         st.dataframe(carboy_history)
+    # elif st.session_state.page_state == 1:
+    #     st.markdown("Form Submitted")
 
-                if st.form_submit_button('Submit Action'):
-                    insert_row(conn, "brew", mead_id, carboy_id, date, ingredient_name, ingredient_mass, notes)
+    #     if st.button("Submit Another"):
+    #         st.session_state.page_state = 0
+    #         st.rerun()
+with tab_measurement:
+    add_measurement_form()
 
-
-            specific_gravity = st.number_input("Specific Gravity", value=1.010, min_value=.990, step=.001)
-            notes = st.text_input("Brew Notes")
-            if st.button("Finish"):
-                insert_row(conn, "brew", mead_id, carboy_id, date, specific_gravity, notes)
-        elif carboy_state == "Secondary Fermentation": 
-            pass
-        elif carboy_state == "Rack/Age": 
-            if final_specific_gravity is not None:
-                st.markdown(f"~ABV: {(init_specific_gravity - final_specific_gravity) * 131.25}")
-                final_brix = 143.254 * final_specific_gravity**3 - 648.670 * final_specific_gravity**2 + 1125.805 * final_specific_gravity - 620.389
-                st.markdown(f"~Brix: {final_brix}")
-                st.markdown(f"~RS: {98*final_brix}") 
-                # st.markdown(f"~g/L: {98*final_brix/(water_mass+other_liquid_mass+)}")
-        elif carboy_state == "Bottle": 
-            pass
-        elif carboy_state == "Empty": 
-            pass
-
-        st.dataframe(carboy_history_table)
-    elif st.session_state.page_state == 1:
-        st.markdown("Form Submitted")
-
-        if st.button("Submit Another"):
-            st.session_state.page_state = 0
-            st.rerun()
-
+with tab_rack:
+    rack_form()
 
 with tab_calc:
     max_volume = st.number_input(label="Total Volume (L)", value=1.750)

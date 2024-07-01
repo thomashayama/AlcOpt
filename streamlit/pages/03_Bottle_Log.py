@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 # SQL
 from sqlalchemy import create_engine, asc
@@ -22,24 +23,58 @@ with tab_new_vessel:
     with st.form(key="new_vessel"):
         date = st.date_input("Date Added")
         material = st.text_input("Material", value="Glass")
-        capacity_liters = st.number_input("Capacity (L)", value=1.750, min_value=0.00)
+        volume_liters = st.number_input("Volume (L)", value=2.000, min_value=0.00)
+        empty_mass = st.number_input("Empty Mass (g)", value=792.0, min_value=0.00)
+        vessel_button = st.form_submit_button('Submit')
 
-        if st.form_submit_button('Submit'):
-            session = Session()
-            new_vessel = Vessel(capacity_liters=capacity_liters, material=material)
-            session.add(new_vessel)
-            session.commit()
-            session.close()
-            st.success("Vessel added successfully!")
+    session = Session()
+    if vessel_button:
+        new_vessel = Vessel(volume_liters=volume_liters, material=material, empty_mass=empty_mass, date_added=date)
+        session.add(new_vessel)
+        session.commit()
+        st.success("Vessel added successfully!")
+    
+    vessels = session.query(Vessel).all()
+    vessels_list = [
+        {
+        "ID": vessel.id,
+        "Volume (L)": vessel.volume_liters,
+        "Empty Mass (g)": vessel.empty_mass,
+        "Date Added": vessel.date_added,
+        "Fermentation ID": vessel.fermentation_id
+        }
+        for vessel in vessels
+    ]
+    vessels = pd.DataFrame(vessels_list)
+    st.dataframe(vessels, use_container_width=True, hide_index=True)
+    session.close()
+
 with tab_new_bottle:
     with st.form(key="new_bottle"):
         date = st.date_input("Date Added")
-        volume_liters = st.number_input("Volume (L)", value=0.750, min_value=0.00)
-
-        if st.form_submit_button('Submit'):
-            session = Session()
-            new_bottle = Bottle(volume_liters=volume_liters)
-            session.add(new_bottle)
-            session.commit()
-            session.close()
-            st.success("Bottle added successfully!")
+        volume_liters = st.number_input("Volume (L)", value=0.500, min_value=0.00)
+        empty_mass = st.number_input("Empty Mass (g)", value=500.0, min_value=0.00)
+        bottle_button = st.form_submit_button('Submit')
+    
+    session = Session()
+    if bottle_button:
+        new_bottle = Bottle(volume_liters=volume_liters, empty_mass=empty_mass, date_added=date)
+        session.add(new_bottle)
+        session.commit()
+        st.success("Bottle added successfully!")
+    
+    bottles = session.query(Bottle).all()
+    bottles_list = [
+        {
+        "ID": bottle.id,
+        "Volume (L)": bottle.volume_liters,
+        "Empty Mass (g)": bottle.empty_mass,
+        "Date Added": bottle.date_added,
+        "Fermentation ID": bottle.fermentation_id,
+        "Bottling Date": bottle.bottling_date
+        }
+        for bottle in bottles
+    ]
+    bottles = pd.DataFrame(bottles_list)
+    st.dataframe(bottles, use_container_width=True, hide_index=True)
+    session.close()
