@@ -5,4 +5,4 @@ mpld3
 matplotlib
 
 # SQL visualization
-eralchemy
+# eralchemy
