@@ -5,7 +5,7 @@ import numpy as np
 # SQL
 from sqlalchemy import create_engine, asc, desc
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy_models import Fermentation, Bottle, Review
+from alcopt.sqlalchemy_models import Fermentation, Bottle, Review
 from datetime import datetime
 
 st.set_page_config(

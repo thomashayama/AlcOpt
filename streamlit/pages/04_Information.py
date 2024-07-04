@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
-from sqlalchemy_models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
+
+from alcopt.sqlalchemy_models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
 
 
 st.set_page_config(
