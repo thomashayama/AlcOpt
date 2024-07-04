@@ -8,7 +8,7 @@ import streamlit as st
 # SQL
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy_models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog
+from sqlalchemy_models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle
 
 st.set_page_config(
     page_title="Brew Tracking",
@@ -36,41 +36,6 @@ def add_new_ingredient():
                 except Exception as e:
                     # st.error("Ingredient already in table!!")
                     st.error(e)
-
-
-def add_fermentation():
-    with st.form("Add Ingredient"):
-        if st.form_submit_button('Add'):
-            try:
-                session = Session()
-                new_fermentation = Fermentation(start_date=datetime.now(), initial_specific_gravity=1.080)
-                session.add(new_fermentation)
-                session.commit()
-                print("Fermentation added successfully with ID:", new_fermentation.id)
-                session.close()
-                return new_fermentation.id
-            except Exception as e:
-                st.error(f"Error {e}")
-
-
-def add_fermentation_vessel_log(vessel_id, fermentation_id):
-    with st.form("Add Ingredient"):
-        if st.form_submit_button('Add'):
-            try:
-                session = Session()
-                vessel_log = FermentationVesselLog(
-                    fermentation_id=fermentation_id,
-                    vessel_id=vessel_id,
-                    start_date=datetime.now()
-                )
-                session.add(vessel_log)
-                session.commit()
-                print("Fermentation Vessel Log added successfully with ID:", vessel_log.id)
-                session.close()
-                return vessel_log.id
-            except Exception as e:
-                st.error(f"Error {e}")
-
 
 def add_fermentation_ingredient(ingredient_name=None):
     """Add Ingredient to a fermentation"""
@@ -122,7 +87,6 @@ def add_fermentation_ingredient(ingredient_name=None):
                     session.add(new_ferm_ingredient)
                     session.commit()
                     st.success(f"Created New Fermentation Ingredient <{new_ferm_ingredient.id}>")
-                    return new_fermentation.id
             except Exception as e:
                 st.error(f"Error {e}")
         session.close()
@@ -131,7 +95,7 @@ def add_measurement_form():
     st.title("Add Specific Gravity Measurement")
 
     with st.form(key='measurement_form'):
-        fermentation_id = st.number_input("Fermentation ID", min_value=1, step=1)
+        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
         measurement_date = st.date_input("Measurement Date", value=datetime.now())
         specific_gravity = st.number_input("Specific Gravity", value=.999, min_value=0.0, step=0.001, format="%.3f")
 
@@ -139,15 +103,22 @@ def add_measurement_form():
 
     if submit_button:
         try:
-            # Add new specific gravity measurement
-            new_measurement = SpecificGravityMeasurement(
-                fermentation_id=fermentation_id,
-                measurement_date=measurement_date,
-                specific_gravity=specific_gravity
-            )
-            session.add(new_measurement)
-            session.commit()
-            st.success(f"Measurement added successfully for Fermentation ID: {fermentation_id}")
+            vessel = session.query(Vessel).filter_by(id=vessel_id).first()
+            if vessel is None:
+                st.error(f"Vessel {vessel_id} not found")
+            else:
+                if vessel.fermentation_id is None:
+                    st.error(f"Vessel {vessel_id} doesn't have a fermentation")
+                else:
+                    # Add new specific gravity measurement
+                    new_measurement = SpecificGravityMeasurement(
+                        fermentation_id=vessel.fermentation_id,
+                        measurement_date=measurement_date,
+                        specific_gravity=specific_gravity
+                    )
+                    session.add(new_measurement)
+                    session.commit()
+                    st.success(f"Measurement added successfully for Fermentation ID: {vessel.fermentation_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
             session.rollback()
@@ -182,25 +153,92 @@ def rack_form():
         finally:
             session.close()
 
+def bottle_form():
+    with st.form(key='bottle_form'):
+        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+        bottle_id = st.number_input("Bottle ID", value=1, min_value=1, step=1)
+        date = st.date_input("Date")
+        submit_button = st.form_submit_button(label='Add Action')
+
+    if submit_button:
+        try:
+            vessel = session.query(Vessel).filter_by(id=vessel_id).first()
+            bottle = session.query(Bottle).filter_by(id=bottle_id).first()
+            bottle.fermentation_id = vessel.fermentation_id
+            bottle.bottling_date = date
+            session.commit()
+            st.success(f"Bottled from Vessel {vessel.id} into Bottle {bottle.id}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+    if st.button("Vessel Empty"):
+        vessel = session.query(Vessel).filter_by(id=vessel_id).first()
+        vessel.fermentation_id = None
+        session.commit()
+        st.success(f"Vessel {vessel.id} Emptied")
+    session.close()
 
 engine = create_engine('sqlite:///wine_mead.db')
 Session = sessionmaker(bind=engine)
 session = Session()
 
-fermentation_ingredients = session.query(FermentationIngredient).all()
-fermentation_ingredients_list = [
-    {
-    "ID": fermentation_ingredient.id,
-    "Amount": fermentation_ingredient.amount,
-    "Unit": fermentation_ingredient.unit,
-    "Date Added": fermentation_ingredient.added_at,
-    "Fermentation ID": fermentation_ingredient.fermentation_id
-    }
-    for fermentation_ingredient in fermentation_ingredients
-]
-fermentation_ingredients = pd.DataFrame(fermentation_ingredients_list)
+def all_ferm_ingredients_info(session):
+    fermentation_ingredients = session.query(FermentationIngredient).all()
+    fermentation_ingredients_list = [
+        {
+        "ID": fermentation_ingredient.id,
+        "Amount": fermentation_ingredient.amount,
+        "Unit": fermentation_ingredient.unit,
+        "Date Added": fermentation_ingredient.added_at,
+        "Fermentation ID": fermentation_ingredient.fermentation_id
+        }
+        for fermentation_ingredient in fermentation_ingredients
+    ]
+    return pd.DataFrame(fermentation_ingredients_list)
 
-tab_ingredient, tab_measurement, tab_rack, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Calculator"])
+def all_vessel_log_info(session):
+    vessel_logs = session.query(FermentationVesselLog).all()
+    vessel_logs_list = [
+        {
+        "ID": vessel_log.id,
+        "Fermentation ID": vessel_log.fermentation_id,
+        "Vessel ID": vessel_log.vessel_id,
+        "Start Date": vessel_log.start_date,
+        "End Date": vessel_log.end_date,
+        }
+        for vessel_log in vessel_logs
+    ]
+    return pd.DataFrame(vessel_logs_list)
+
+def all_measurement_info(session):
+    measurements = session.query(SpecificGravityMeasurement).all()
+    measurements_list = [
+        {
+        "ID": measurement.id,
+        "Fermentation ID": measurement.fermentation_id,
+        "Specific Gravity": measurement.specific_gravity,
+        "Measurement Date": measurement.measurement_date,
+        }
+        for measurement in measurements
+    ]
+    return pd.DataFrame(measurements_list)
+
+def all_bottle_info(session):
+    bottles = session.query(Bottle).all()
+    bottles_list = [
+        {
+        "ID": bottle.id,
+        "Volume (L)": bottle.volume_liters,
+        "Empty Mass (g)": bottle.empty_mass,
+        "Date Added": bottle.date_added,
+        "Fermentation ID": bottle.fermentation_id,
+        "Bottling Date": bottle.bottling_date
+        }
+        for bottle in bottles
+    ]
+    return pd.DataFrame(bottles_list)
+
+tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
 
 with tab_ingredient:
     session = Session()
@@ -217,34 +255,24 @@ with tab_ingredient:
     
     add_fermentation_ingredient(ingredient_name=ingredient_name)
 
-    st.dataframe(fermentation_ingredients[::-1], use_container_width=True, hide_index=True)
+    st.dataframe(all_ferm_ingredients_info(session)[::-1], hide_index=True)
 
-#             specific_gravity = st.number_input("Specific Gravity", value=1.010, min_value=.990, step=.001)
-#             notes = st.text_input("Brew Notes")
-#             if st.button("Finish"):
-#                 insert_row(conn, "brew", mead_id, carboy_id, date, specific_gravity, notes)
-#         elif carboy_state == "Secondary Fermentation": 
-#             pass
-#         elif carboy_state == "Rack/Age": 
-#             if final_specific_gravity is not None:
-#                 st.markdown(f"~ABV: {(init_specific_gravity - final_specific_gravity) * 131.25}")
 #                 final_brix = 143.254 * final_specific_gravity**3 - 648.670 * final_specific_gravity**2 + 1125.805 * final_specific_gravity - 620.389
 #                 st.markdown(f"~Brix: {final_brix}")
 #                 st.markdown(f"~RS: {98*final_brix}") 
 #                 # st.markdown(f"~g/L: {98*final_brix/(water_mass+other_liquid_mass+)}")
 
-#         st.dataframe(carboy_history)
-    # elif st.session_state.page_state == 1:
-    #     st.markdown("Form Submitted")
-
-    #     if st.button("Submit Another"):
-    #         st.session_state.page_state = 0
-    #         st.rerun()
 with tab_measurement:
     add_measurement_form()
+    st.dataframe(all_measurement_info(session)[::-1], hide_index=True)
 
 with tab_rack:
     rack_form()
+    st.dataframe(all_vessel_log_info(session)[::-1], hide_index=True)
+
+with tab_bottle:
+    bottle_form()
+    st.dataframe(all_bottle_info(session), hide_index=True)
 
 with tab_calc:
     max_volume = st.number_input(label="Total Volume (L)", value=1.750)

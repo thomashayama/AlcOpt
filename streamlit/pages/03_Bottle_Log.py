@@ -76,5 +76,5 @@ with tab_new_bottle:
         for bottle in bottles
     ]
     bottles = pd.DataFrame(bottles_list)
-    st.dataframe(bottles, use_container_width=True, hide_index=True)
+    st.dataframe(bottles, hide_index=True)
     session.close()
