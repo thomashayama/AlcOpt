@@ -29,7 +29,7 @@ class Fermentation(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date)
-    # end_mass = Column(REAL)
+    end_mass = Column(REAL)
     vessel_logs = relationship("FermentationVesselLog", back_populates="fermentation")
     ingredients = relationship("FermentationIngredient", back_populates="fermentation")
     measurements = relationship("SpecificGravityMeasurement", back_populates="fermentation")
@@ -103,6 +103,7 @@ class Review(Base):
     fermentation = relationship("Fermentation", back_populates="reviews")
     bottle = relationship("Bottle", back_populates="reviews")
 
-# Set up the database
-engine = create_engine('sqlite:///wine_mead.db')
-Base.metadata.create_all(engine)
+if __name__ == '__main__':
+    # Set up the database
+    engine = create_engine('sqlite:///wine_mead.db')
+    Base.metadata.create_all(engine)

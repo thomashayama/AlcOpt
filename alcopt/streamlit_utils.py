@@ -1,6 +1,6 @@
 import pandas as pd
 
-from alcopt.sqlalchemy_models import FermentationIngredient, Bottle, FermentationVesselLog, SpecificGravityMeasurement, Vessel
+from alcopt.database.models import FermentationIngredient, Bottle, FermentationVesselLog, SpecificGravityMeasurement, Vessel
 
 def all_ferm_ingredients_info(session):
     fermentation_ingredients = session.query(FermentationIngredient).all()

@@ -7,29 +7,23 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
 
-from alcopt.sqlalchemy_models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
-
+from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
+from alcopt.utils import sg_diff_to_abv
+from alcopt.database.utils import get_db
 
 st.set_page_config(
     page_title="Information",
     # page_icon="🍷",
 )
 
-engine = create_engine('sqlite:///wine_mead.db')
-Session = sessionmaker(bind=engine)
-session = Session()
-
-def sg_diff_to_abv(sg_diff):
-    return sg_diff * 131.25
-
-def display_fermentation_info(fermentation):
+def display_fermentation_info(db, fermentation):
     st.subheader("Fermentation Details")
     st.write(f"**Fermentation ID:** {fermentation.id}")
     st.write(f"**Start Date:** {fermentation.start_date}")
     st.write(f"**End Date:** {fermentation.end_date}")
 
     st.subheader("Ingredients")
-    ingredients = session.query(FermentationIngredient).filter_by(fermentation_id=fermentation.id).all()
+    ingredients = db.query(FermentationIngredient).filter_by(fermentation_id=fermentation.id).all()
     if ingredients: 
         ingredients_df = pd.DataFrame([(ing.ingredient.name, ing.amount, ing.unit, (ing.added_at - fermentation.start_date).days) for ing in ingredients], columns=["Ingredient", "Amount", "Unit", "Days from Start"])
         grouped_ingredients = ingredients_df.groupby(["Ingredient", "Days from Start"]).agg({"Amount": "sum", "Unit": "first"}).reset_index()
@@ -38,7 +32,7 @@ def display_fermentation_info(fermentation):
         st.write("No ingredients added yet.")
 
     st.subheader("Specific Gravity Measurements")
-    measurements = session.query(SpecificGravityMeasurement).filter_by(fermentation_id=fermentation.id).all()
+    measurements = db.query(SpecificGravityMeasurement).filter_by(fermentation_id=fermentation.id).all()
     if measurements:
         initial_sg = measurements[0].specific_gravity
         final_sg = measurements[-1].specific_gravity
@@ -89,64 +83,62 @@ def display_fermentation_info(fermentation):
         st.write("No specific gravity measurements yet.")
 
 def get_vessel_info(vessel_id):
-    try:
-        vessel = session.query(Vessel).filter_by(id=vessel_id).first()
+    with get_db() as db:
+        try:
+            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
 
-        if not vessel:
-            st.error(f"No vessel found with ID: {vessel_id}")
-            return
+            if not vessel:
+                st.error(f"No vessel found with ID: {vessel_id}")
+                return
 
-        fermentation = session.query(Fermentation).filter_by(id=vessel.fermentation_id).first() if vessel.fermentation_id else None
+            fermentation = db.query(Fermentation).filter_by(id=vessel.fermentation_id).first() if vessel.fermentation_id else None
 
-        st.title(f"Vessel Information for Vessel ID: {vessel_id}")
+            st.title(f"Vessel Information for Vessel ID: {vessel_id}")
 
-        st.subheader("Vessel Details")
-        st.write(f"**Volume (liters):** {vessel.volume_liters}")
-        st.write(f"**Material:** {vessel.material}")
-        st.write(f"**Empty Mass:** {vessel.empty_mass}")
-        st.write(f"**Date Added:** {vessel.date_added}")
+            st.subheader("Vessel Details")
+            st.write(f"**Volume (liters):** {vessel.volume_liters}")
+            st.write(f"**Material:** {vessel.material}")
+            st.write(f"**Empty Mass:** {vessel.empty_mass}")
+            st.write(f"**Date Added:** {vessel.date_added}")
 
-        if fermentation:
-            display_fermentation_info(fermentation)
-        else:
-            st.write("This vessel is not currently used in any fermentation.")
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-    finally:
-        session.close()
+            if fermentation:
+                display_fermentation_info(db, fermentation)
+            else:
+                st.write("This vessel is not currently used in any fermentation.")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
 def get_bottle_info(bottle_id):
-    try:
-        bottle = session.query(Bottle).filter_by(id=bottle_id).first()
+    with get_db() as db:
+        try:
+            bottle = db.query(Bottle).filter_by(id=bottle_id).first()
 
-        if not bottle:
-            st.error(f"No bottle found with ID: {bottle_id}")
-            return
+            if not bottle:
+                st.error(f"No bottle found with ID: {bottle_id}")
+                return
 
-        fermentation = session.query(Fermentation).filter_by(id=bottle.fermentation_id).first() if bottle.fermentation_id else None
+            fermentation = db.query(Fermentation).filter_by(id=bottle.fermentation_id).first() if bottle.fermentation_id else None
 
-        st.title(f"Bottle Information for Bottle ID: {bottle_id}")
+            st.title(f"Bottle Information for Bottle ID: {bottle_id}")
 
-        st.subheader("Bottle Details")
-        st.write(f"**Volume (liters):** {bottle.volume_liters}")
-        st.write(f"**Empty Mass:** {bottle.empty_mass}")
-        st.write(f"**Date Added:** {bottle.date_added}")
-        st.write(f"**Bottling Date:** {bottle.bottling_date}")
+            st.subheader("Bottle Details")
+            st.write(f"**Volume (liters):** {bottle.volume_liters}")
+            st.write(f"**Empty Mass:** {bottle.empty_mass}")
+            st.write(f"**Date Added:** {bottle.date_added}")
+            st.write(f"**Bottling Date:** {bottle.bottling_date}")
 
-        if fermentation:
-            display_fermentation_info(fermentation)
+            if fermentation:
+                display_fermentation_info(db, fermentation)
 
-        st.subheader("Reviews")
-        reviews = session.query(Review).filter_by(bottle_id=bottle_id).all()
-        if reviews:
-            reviews_df = pd.DataFrame([(r.overall_rating, r.boldness, r.tannicity, r.sweetness, r.acidity, r.complexity, r.review_date) for r in reviews], columns=["Overall Rating", "Boldness", "Tannicity", "Sweetness", "Acidity", "Complexity", "Review Date"])
-            st.dataframe(reviews_df, hide_index=True)
-        else:
-            st.write("No reviews for this bottle yet.")
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-    finally:
-        session.close()
+            st.subheader("Reviews")
+            reviews = db.query(Review).filter_by(bottle_id=bottle_id).all()
+            if reviews:
+                reviews_df = pd.DataFrame([(r.overall_rating, r.boldness, r.tannicity, r.sweetness, r.acidity, r.complexity, r.review_date) for r in reviews], columns=["Overall Rating", "Boldness", "Tannicity", "Sweetness", "Acidity", "Complexity", "Review Date"])
+                st.dataframe(reviews_df, hide_index=True)
+            else:
+                st.write("No reviews for this bottle yet.")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
 def vessel_info_form():
     st.title("Retrieve Vessel or Bottle Information")
