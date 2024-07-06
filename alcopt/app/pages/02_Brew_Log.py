@@ -11,6 +11,7 @@ from sqlalchemy import asc
 from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db
+from alcopt.utils import sugar_to_abv
 
 st.set_page_config(
     page_title="Brew Tracking",
@@ -22,18 +23,17 @@ if "new_ingredients" not in st.session_state:
 def add_new_ingredient(db):
     with st.form("Add New Ingredient"):
         ingredient_name = st.text_input("New Ingredient Name")
-        sugar_content = st.number_input("Sugar Content (g/L)", value=0.0)
-        ingredient_type = st.radio("Type", ["Liquid", "Solvent", "Solid"])
-        density = st.number_input("Density (kg/L)", value=1.0)
-        price = st.number_input("Price ($)", value=0.00)
+        sugar_content = st.number_input("Sugar Content (g/L or g)", value=0.0)
+        ingredient_type = st.radio("Type", ["Liquid", "Solute", "Solid"])
+        density = st.number_input("Density (g/mL)", value=1.0)
+        price = st.number_input("Price ($/L or kg)", value=0.00)
         notes = st.text_input("Additional Notes")
         if st.form_submit_button('Add'):
             if ingredient_name is not None and ingredient_name != "":
                 try:
-                    with get_db() as db:
-                        new_ingredient = Ingredient(name=ingredient_name, sugar_content=sugar_content, ingredient_type=ingredient_type, density=density, price=price, notes=notes)
-                        db.add(new_ingredient)
-                        db.commit()
+                    new_ingredient = Ingredient(name=ingredient_name, sugar_content=sugar_content, ingredient_type=ingredient_type, density=density, price=price, notes=notes)
+                    db.add(new_ingredient)
+                    db.commit()
                 except Exception as e:
                     # st.error("Ingredient already in table!!")
                     st.error(e)
@@ -173,6 +173,91 @@ def bottle_form(db):
         db.commit()
         st.success(f"Vessel {vessel.id} Emptied")
 
+def calculate_max_potential_abv(ingredients):
+    # Constants for calculation
+    total_sugar_grams = sum(
+        ingredient['amount'] * ingredient['sugar_content'] * (ingredient['density'] if ingredient['unit'] == 'mL' else 1)
+        for ingredient in ingredients if ingredient['sugar_content'] is not None
+    )
+    
+    fermentation_volume = sum(
+        ingredient['amount'] * (1 if ingredient['unit'] == 'mL' else 1 / ingredient['density'])
+        for ingredient in ingredients if ingredient['ingredient_type'] != 'Solvent'
+    )
+
+    if fermentation_volume > 0:
+        max_potential_abv = sugar_to_abv(1000 * total_sugar_grams / fermentation_volume)
+        return max_potential_abv, 1000 * total_sugar_grams / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
+    else:
+        return 0, 0, fermentation_volume  # Avoid division by zero
+
+def display_ingredient_calculator():
+    st.title("Fermentation Ingredient Calculator")
+
+    # Select vessel ID to load vessel information
+    vessel_id = st.number_input("Vessel ID", min_value=1, step=1)
+
+    with get_db() as db:
+        vessel = db.query(Vessel).filter_by(id=vessel_id).first()
+        if not vessel:
+            st.error("No vessel found with the given ID.")
+            return
+
+        max_vessel_volume = vessel.volume_liters
+
+        ingredients = db.query(Ingredient).all()
+
+    st.write(f"Maximum Vessel Volume: {max_vessel_volume:.2f} liters")
+
+    # Select ingredients
+    ingredient_options = {ingredient.name: ingredient for ingredient in ingredients}
+    selected_ingredient_names = st.multiselect("Select Ingredients", list(ingredient_options.keys()))
+
+    selected_ingredients = []
+    for name in selected_ingredient_names:
+        ingredient = ingredient_options[name]
+        col_unit, col_amount = st.columns([1, 3])
+        unit = col_unit.radio(f"Unit for {ingredient.name}", options=["g", "mL"], key=f"{ingredient.id}_unit")
+        amount = col_amount.number_input(f"Amount of {ingredient.name} ({unit})", min_value=0.0, step=1.0, key=f"{ingredient.id}_amount")
+        selected_ingredients.append({
+            'id': ingredient.id,
+            'name': ingredient.name,
+            'sugar_content': ingredient.sugar_content,
+            'amount': amount,
+            'ingredient_type': ingredient.ingredient_type,
+            'density': ingredient.density,
+            'unit': unit,
+        })
+
+    # Calculate fermentation volume automatically from added ingredients
+    if selected_ingredients:
+        max_abv, max_sugar_content, fermentation_volume = calculate_max_potential_abv(selected_ingredients)
+
+        # Display current volume taken up by added ingredients
+        st.write(f"Current Total Volume: {fermentation_volume:.2f} liters")
+
+        # Check if the maximum volume is exceeded
+        if fermentation_volume > max_vessel_volume * 1000:
+            st.error("Error: Total volume exceeds the maximum vessel volume!")
+        elif fermentation_volume > 0.9 * max_vessel_volume * 1000:
+            st.warning("Warning: Total volume is above 90% of the maximum vessel volume!")
+
+        # Handle case where max_abv and max_sugar_content are both 0
+        if max_abv == 0:
+            st.error("No valid ingredients added to calculate ABV and sugar content.")
+            return
+
+        # Slider for the desired ABV
+        desired_abv = st.slider("Desired ABV (%)", min_value=0.0, max_value=max_abv, step=0.1, key="desired_abv")
+
+        # Calculate and display the resulting sugar content based on the desired ABV
+        resulting_sugar_content = max_sugar_content - desired_abv * 17
+        st.write(f"**Resulting Sugar Content:** {resulting_sugar_content:.2f} g/L")
+
+        # Display maximum potential ABV and corresponding sugar content
+        st.write(f"**Maximum Potential ABV:** {max_abv:.2f}%")
+        st.write(f"**Maximum Sugar Content:** {max_sugar_content:.2f} g/L")
+
 
 tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
 
@@ -186,7 +271,7 @@ with get_db() as db:
 
         # Create text input for user entry
         if ingredient_name == "*New Ingredient": 
-            add_new_ingredient()
+            add_new_ingredient(db)
         
         add_fermentation_ingredient(ingredient_name=ingredient_name)
 
@@ -210,42 +295,4 @@ with get_db() as db:
         st.dataframe(all_bottle_info(db), hide_index=True)
 
     with tab_calc:
-        max_volume = st.number_input(label="Total Volume (L)", value=1.750)
-
-        col1, col2, col3 = st.columns((8, 1, 8))
-        honey_sugar = col1.number_input(label="Honey Sugar (g)", value=17)
-        col2.markdown("# /")
-        honey_sugar = honey_sugar/col3.number_input(label="(L)", value=0.0147868, step=0.00001)
-        honey_density = st.number_input(label="Honey Density (g/L)", value=21/0.0147868)
-
-        col1, col2, col3 = st.columns((8, 1, 8))
-        liquid_sugar = col1.number_input(label="Liquid Sugar (g)", value=29)
-        col2.markdown("# /")
-        liquid_sugar = liquid_sugar/col3.number_input(label="(L)", value=0.236588, step=0.00001)
-        liquid_density = st.number_input(label="Liquid Density (g/L)", value=1026)
-
-        target_abv = st.number_input(label="Target ABV (%)", value=12, help="Beer 5, Moscato 5-6, Riesling 8-8.5, Champagne 11, Pinot Noir 11.5-13.5") # in %
-        sugar_per_abv = st.number_input(label="Sugar/ABV", value=17)
-
-        target_sugar = target_abv * sugar_per_abv * max_volume
-
-        honey_vol = (target_sugar-max_volume*liquid_sugar)/(honey_sugar-liquid_sugar)
-        liquid_vol = max_volume - honey_vol
-
-        printout_data = [
-            {"Parameter": "max_volume", "Value": max_volume}, 
-            {"Parameter": "honey_sugar", "Value": honey_sugar}, 
-            {"Parameter": "honey_density", "Value": honey_density}, 
-            {"Parameter": "liquid_sugar", "Value": liquid_sugar}, 
-            {"Parameter": "liquid_density", "Value": liquid_density}, 
-            {"Parameter": "target_abv", "Value": target_abv}, 
-            {"Parameter": "sugar_per_abv", "Value": sugar_per_abv}, 
-            {"Parameter": "target_sugar", "Value": target_sugar}, 
-            {"Parameter": "L Liquid", "Value": liquid_vol}, 
-            {"Parameter": "g Liquid", "Value": liquid_vol * liquid_density}, 
-            {"Parameter": "L Honey", "Value": honey_vol}, 
-            {"Parameter": "g Honey", "Value": honey_vol * honey_density}, 
-            ]
-
-        printout = pd.DataFrame(printout_data)
-        st.dataframe(printout, hide_index=True)
+        display_ingredient_calculator()
