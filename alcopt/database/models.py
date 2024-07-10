@@ -34,6 +34,7 @@ class Fermentation(Base):
     ingredients = relationship("FermentationIngredient", back_populates="fermentation")
     measurements = relationship("SpecificGravityMeasurement", back_populates="fermentation")
     bottles = relationship("Bottle", back_populates="fermentation")
+    bottle_logs = relationship("BottleLog", back_populates="fermentation")
     reviews = relationship("Review", back_populates="fermentation")
 
 class FermentationVesselLog(Base):
@@ -88,10 +89,23 @@ class BottleIngredient(Base):
     bottle = relationship("Bottle", back_populates="ingredients")
     ingredient = relationship("Ingredient")
 
+class BottleLog(Base):
+    __tablename__ = 'bottle_log'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fermentation_id = Column(Integer, ForeignKey('fermentations.id'), nullable=False)
+    vessel_id = Column(Integer, ForeignKey('vessels.id'), nullable=False)
+    bottle_id = Column(Integer, ForeignKey('bottles.id'), nullable=False)
+    bottling_date = Column(Date, nullable=False)
+    amount = Column(REAL)
+    unit = Column(String)
+    fermentation = relationship("Fermentation", back_populates="bottle_logs")
+    vessel = relationship("Vessel")
+
 class Review(Base):
     __tablename__ = 'reviews'
     id = Column(Integer, primary_key=True, autoincrement=True)
     bottle_id = Column(Integer, ForeignKey('bottles.id'), nullable=False)
+    name = Column(String)
     fermentation_id = Column(Integer, ForeignKey('fermentations.id'), nullable=False)
     overall_rating = Column(REAL, CheckConstraint('overall_rating >= 1.0 AND overall_rating <= 5.0'), nullable=False)
     boldness = Column(REAL, CheckConstraint('boldness >= 1.0 AND boldness <= 5.0'), nullable=False)
@@ -105,5 +119,5 @@ class Review(Base):
 
 if __name__ == '__main__':
     # Set up the database
-    engine = create_engine('sqlite:///wine_mead.db')
+    engine = create_engine('sqlite:///alcopt.db')
     Base.metadata.create_all(engine)

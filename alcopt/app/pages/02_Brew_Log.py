@@ -8,7 +8,7 @@ import streamlit as st
 # SQL
 from sqlalchemy import asc
 
-from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle
+from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db
 from alcopt.utils import sugar_to_abv
@@ -154,12 +154,29 @@ def bottle_form(db):
         vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
         bottle_id = st.number_input("Bottle ID", value=1, min_value=1, step=1)
         date = st.date_input("Date")
+        col_start, col_end = st.columns([1, 1])
+        start_amount = col_start.number_input("Starting Amount", value=0.0, min_value=0.0)
+        end_amount = col_end.number_input("Ending Amount", value=0.0, min_value=0.0)
+        amount = end_amount - start_amount
+        unit = st.text_input("Units", "g")
         submit_button = st.form_submit_button(label='Add Action')
 
     if submit_button:
         try:
             vessel = db.query(Vessel).filter_by(id=vessel_id).first()
             bottle = db.query(Bottle).filter_by(id=bottle_id).first()
+            bottle_log = BottleLog(
+                fermentation_id=vessel.fermentation_id,
+                bottle_id=bottle.id,
+                vessel_id=vessel_id,
+                bottling_date=date,
+                amount=amount,
+                unit=unit,
+            )
+            db.add(bottle_log)
+            db.commit()
+            st.success(f"Created New Bottle Log <{bottle_log.id}>")
+
             bottle.fermentation_id = vessel.fermentation_id
             bottle.bottling_date = date
             db.commit()
