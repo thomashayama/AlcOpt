@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from datetime import datetime
 
 from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
-from alcopt.utils import sg_diff_to_abv
+from alcopt.utils import sg_diff_to_abv, BENCHMARK
 from alcopt.database.utils import get_db
 
 st.set_page_config(
@@ -63,19 +63,12 @@ def display_fermentation_info(db, fermentation):
         ax2.set_ylim(*ylim2)
         ax2.tick_params(axis='y', labelcolor='tab:red')
 
-        benchmark_abv = {
-            'Beer': 5.0,
-            'Moscato': 7.0,
-            'Riesling': 9.0,
-            'Cabernet Sauvignon': 12.0,
-            'Zinfandel': 15.0,
-            'Port': 20.0,
-        }
-
-        for wine, abv in benchmark_abv.items():
-            if abv <= ylim2[0] and abv >= ylim2[1]:
-                ax2.axhline(y=abv, color='green', linestyle='--')
-                ax2.text(0, abv, f'{wine} {abv}%', color='green', verticalalignment='bottom')
+        for item in BENCHMARK:
+            if item['abv'] is not None:
+                abv = item['abv']
+                if abv <= ylim2[0] and abv >= ylim2[1]:
+                    ax2.axhline(y=abv, color='green', linestyle='--')
+                    ax2.text(0, abv, f"{item['name']} {abv}%", color='green', verticalalignment='bottom')
 
         fig.tight_layout()
         st.pyplot(fig)

@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from alcopt.database.models import Fermentation, Review
+from alcopt.database.models import Fermentation, Review, Bottle, SpecificGravityMeasurement
 from alcopt.database.queries import get_fermentation_leaderboard
 from alcopt.database.utils import init_db, get_db
 
@@ -25,21 +25,101 @@ st.markdown(
 """
 )
 
-st.page_link("pages/01_Tasting_Form.py", label="Tasting Form", icon="1️⃣")
-st.page_link("pages/02_Brew_Log.py", label="Brew Logging", icon="2️⃣")
-st.page_link("pages/03_Bottle_Log.py", label="Bottle Logging", icon="2️⃣")
+# st.page_link("pages/01_Tasting_Form.py", label="Tasting Form", icon="1️⃣")
+# st.page_link("pages/02_Brew_Log.py", label="Brew Logging", icon="2️⃣")
+# st.page_link("pages/03_Bottle_Log.py", label="Bottle Logging", icon="2️⃣")
 
 # Mead Average Ratings in a Leaderboard
 st.markdown("## Mead Leaderboard")
 st.title("Fermentation Leaderboard")
 
+def sg_to_sugar(sg):
+    """
+    Convert specific gravity to sugar content in grams per liter.
+
+    Parameters:
+    sg (float): Specific gravity.
+
+    Returns:
+    float: Sugar content in grams per liter.
+    """
+    return (sg - 1) * 10_000
+
+def get_ratings_abv_data():
+    with get_db() as db:
+        data = db.query(
+            Review.overall_rating,
+            SpecificGravityMeasurement.fermentation_id,
+            func.max(SpecificGravityMeasurement.specific_gravity).label('initial_sg'),
+            func.min(SpecificGravityMeasurement.specific_gravity).label('final_sg')
+        ).join(
+            Bottle, Review.bottle_id == Bottle.id
+        ).join(
+            Fermentation, Bottle.fermentation_id == Fermentation.id
+        ).join(
+            SpecificGravityMeasurement, Fermentation.id == SpecificGravityMeasurement.fermentation_id
+        ).group_by(
+            Review.id
+        ).all()
+
+        ratings_abv = []
+        for row in data:
+            initial_sg = row.initial_sg
+            final_sg = row.final_sg
+            abv = (initial_sg - final_sg) * 131.25
+            ratings_abv.append((row.overall_rating, abv))
+
+        return ratings_abv
+
+def get_ratings_rs_data():
+    with get_db() as db:
+        data = db.query(
+            Review.overall_rating,
+            SpecificGravityMeasurement.fermentation_id,
+            func.min(SpecificGravityMeasurement.specific_gravity).label('final_sg')
+        ).join(
+            Bottle, Review.bottle_id == Bottle.id
+        ).join(
+            Fermentation, Bottle.fermentation_id == Fermentation.id
+        ).join(
+            SpecificGravityMeasurement, Fermentation.id == SpecificGravityMeasurement.fermentation_id
+        ).group_by(
+            Review.id
+        ).all()
+
+        ratings_rs = []
+        for row in data:
+            rs = sg_to_sugar(row.final_sg)
+            ratings_rs.append((row.overall_rating, rs))
+
+        return ratings_rs
+
 with get_db() as db:
     leaderboard_df = get_fermentation_leaderboard(db)
     st.dataframe(leaderboard_df, hide_index=True)
 
-# Plots
-st.markdown("## Plots")
-fig = plt.figure() 
-plt.plot([1, 2, 3, 4, 5]) 
-
-st.pyplot(fig)
+    # Plots
+    reviews = db.query(Review).all()
+    ratings = [review.overall_rating for review in reviews]
+    st.markdown("## Overall Ratings")
+    rating_hist = plt.figure()
+    plt.hist(ratings, bins=[1, 2, 3, 4, 5], edgecolor="black") 
+    plt.xlabel('Rating')
+    plt.ylabel('# Reviews')
+    st.pyplot(rating_hist)
+    
+    st.markdown("## Rating vs ABV")
+    ratings, abvs = zip(*get_ratings_abv_data())
+    fig = plt.figure() 
+    plt.scatter(abvs, ratings) 
+    plt.xlabel('ABV (%)')
+    plt.ylabel('Overall Rating')
+    st.pyplot(fig)
+    
+    st.markdown("## Rating vs Residual Sugar")
+    ratings, rss = zip(*get_ratings_rs_data())
+    fig = plt.figure() 
+    plt.scatter(rss, ratings) 
+    plt.xlabel('Residual Sugar (g/L)')
+    plt.ylabel('Overall Rating')
+    st.pyplot(fig)

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from time import time
 
 # SQL
 from sqlalchemy import create_engine, asc, desc
@@ -66,6 +67,7 @@ with get_db() as db:
     # Convert to a list of dictionaries
     reviews_list = [
         {
+            'Name': review.name,
             'Bottle ID': review.bottle_id,
             'Overall Rating': review.overall_rating,
             'Boldness': review.boldness,

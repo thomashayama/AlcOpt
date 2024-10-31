@@ -4,6 +4,7 @@ from datetime import datetime
 import cv2
 import numpy as np
 import streamlit as st
+import matplotlib.pyplot as plt
 
 # SQL
 from sqlalchemy import asc
@@ -11,7 +12,7 @@ from sqlalchemy import asc
 from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db
-from alcopt.utils import sugar_to_abv
+from alcopt.utils import sugar_to_abv, BENCHMARK
 
 st.set_page_config(
     page_title="Brew Tracking",
@@ -199,12 +200,12 @@ def calculate_max_potential_abv(ingredients):
     
     fermentation_volume = sum(
         ingredient['amount'] * (1 if ingredient['unit'] == 'mL' else 1 / ingredient['density'])
-        for ingredient in ingredients if ingredient['ingredient_type'] != 'Solvent'
+        for ingredient in ingredients if ingredient['ingredient_type'] != "Solute"
     )
 
     if fermentation_volume > 0:
-        max_potential_abv = sugar_to_abv(1000 * total_sugar_grams / fermentation_volume)
-        return max_potential_abv, 1000 * total_sugar_grams / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
+        max_potential_abv = sugar_to_abv(total_sugar_grams / fermentation_volume)
+        return max_potential_abv, total_sugar_grams / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
     else:
         return 0, 0, fermentation_volume  # Avoid division by zero
 
@@ -275,6 +276,22 @@ def display_ingredient_calculator():
         st.write(f"**Maximum Potential ABV:** {max_abv:.2f}%")
         st.write(f"**Maximum Sugar Content:** {max_sugar_content:.2f} g/L")
 
+        fig, ax = plt.subplots()
+        for item in BENCHMARK:
+            if item['abv'] is None:
+                ax.axhline(item['rs'])
+                ax.text(0, item['rs'], f"{item['name']}", color='black', verticalalignment='bottom')
+            else:
+                ax.scatter(item['abv'], item['rs'], c='blue')
+                ax.text(item['abv'], item['rs'], f"{item['name']}", color='black', verticalalignment='bottom')
+        ax.scatter(desired_abv, resulting_sugar_content, c='green')
+        ax.text(desired_abv, resulting_sugar_content, "Calculation", color='green', verticalalignment='bottom')
+        ax.plot([0, max_abv], [max_sugar_content, 0], color='green', linestyle='--')
+        ax.set_ylabel("Residual Sugar (g/L)")
+        ax.set_xlabel("ABV (%)")
+        ax.set_xlim([0, None])
+        st.pyplot(fig)
+
 
 tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
 
@@ -294,10 +311,6 @@ with get_db() as db:
 
         st.dataframe(all_ferm_ingredients_info(db)[::-1], hide_index=True)
 
-    #                 final_brix = 143.254 * final_specific_gravity**3 - 648.670 * final_specific_gravity**2 + 1125.805 * final_specific_gravity - 620.389
-    #                 st.markdown(f"~Brix: {final_brix}")
-    #                 st.markdown(f"~RS: {98*final_brix}") 
-    #                 # st.markdown(f"~g/L: {98*final_brix/(water_mass+other_liquid_mass+)}")
 
     with tab_measurement:
         add_measurement_form(db)
