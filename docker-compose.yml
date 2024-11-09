@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    ports:
+      - 8912:8501
+    volumes:
+      - .:/app
+    command: "python /app/run_app.py"

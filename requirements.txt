@@ -3,6 +3,8 @@ pandas
 numpy
 mpld3
 matplotlib
+SQLAlchemy
+opencv-python
 
 # SQL visualization
 # eralchemy
