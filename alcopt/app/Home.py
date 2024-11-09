@@ -14,7 +14,7 @@ from alcopt.database.utils import init_db, get_db
 
 st.set_page_config(
     page_title="Home",
-    page_icon="👋",
+    page_icon="🍷",
 )
 
 init_db()

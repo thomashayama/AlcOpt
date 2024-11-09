@@ -16,6 +16,7 @@ from alcopt.utils import sugar_to_abv, BENCHMARK
 
 st.set_page_config(
     page_title="Brew Tracking",
+    page_icon="🍷",
 )
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []

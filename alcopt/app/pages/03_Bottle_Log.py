@@ -7,6 +7,7 @@ from alcopt.streamlit_utils import all_vessels_info, all_bottle_info
 
 st.set_page_config(
     page_title="Bottle Tracking",
+    page_icon="🍷",
 )
 
 if "last_data" not in st.session_state:

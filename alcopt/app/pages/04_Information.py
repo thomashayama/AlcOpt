@@ -13,7 +13,7 @@ from alcopt.database.utils import get_db
 
 st.set_page_config(
     page_title="Information",
-    # page_icon="🍷",
+    page_icon="🍷",
 )
 
 def display_fermentation_info(db, fermentation):
