@@ -1,8 +1,38 @@
 services:
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     ports:
       - 8912:8501
     volumes:
       - .:/app
     command: "python /app/run_app.py"
+    # depends_on:
+    #   - dnsmasq
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - local-network
+
+  # dnsmasq:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.dns
+  #   container_name: dnsmasq
+  #   ports:
+  #     - "53:53/udp"  # Expose the DNS port
+  #   restart: unless-stopped
+  #   networks:
+  #     - local-network
+
+networks:
+  local-network:
+    driver: bridge
