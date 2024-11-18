@@ -5,6 +5,8 @@ mpld3
 matplotlib
 SQLAlchemy
 opencv-python
+# git+https://github.com/trzemecki/Unum.git
+unum
 
 # SQL visualization
 # eralchemy

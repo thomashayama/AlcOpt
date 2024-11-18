@@ -8,6 +8,7 @@ services:
     volumes:
       - .:/app
     command: "python /app/run_app.py"
+    restart: unless-stopped
     # depends_on:
     #   - dnsmasq
 
