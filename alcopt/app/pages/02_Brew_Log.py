@@ -13,7 +13,7 @@ from sqlalchemy import asc
 from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db
-from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
+from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
 
 st.set_page_config(
     page_title="Brew Tracking",
@@ -204,7 +204,6 @@ def get_volume(ingredients):
     for ingredient in ingredients:
         ingredient_type = ingredient['ingredient_type'].lower()
         if ingredient_type in ["liquid", "solvent"]:
-            print("is_liq")
             unit = unit2str(ingredient['amount'])
             if unit in VOLUME_UNITS:
                 volume += ingredient['amount']
@@ -224,7 +223,6 @@ def get_sugar(ingredients):
         if ingredient['sugar_content'] is not None:
             if ingredient_type in ["liquid", "solvent"]:
                 unit = unit2str(ingredient['amount'])
-                print(ingredient_type, unit)
                 if unit in VOLUME_UNITS:
                     sugar += ingredient['amount'] * ingredient['sugar_content']
                 elif unit in MASS_UNITS:
@@ -242,8 +240,6 @@ def calculate_max_potential_abv(ingredients):
     total_sugar = get_sugar(ingredients)
     fermentation_volume = get_volume(ingredients)
     
-    print(total_sugar)
-    print(fermentation_volume)
     if fermentation_volume > 0*mL:
         max_potential_abv = sugar_to_abv(total_sugar / fermentation_volume)
         return max_potential_abv, total_sugar / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
@@ -267,7 +263,7 @@ def display_ingredient_calculator():
 
         ingredients = db.query(Ingredient).all()
 
-    st.write(f"Maximum Vessel Volume: {round(max_vessel_volume.asNumber(units.L), 3)} L")
+    st.write(f"Maximum Vessel Volume: {max_vessel_volume.asNumber(units.L):.2f} L")
 
     # Select ingredients
     ingredient_options = {ingredient.name: ingredient for ingredient in ingredients}
@@ -315,24 +311,33 @@ def display_ingredient_calculator():
         st.write(f"**Resulting Sugar Content:** {resulting_sugar_content.asNumber(units.g/units.L):.2f} g/L")
 
         # Display maximum potential ABV and corresponding sugar content
+        max_sugar = max_sugar_content.asNumber(units.g/units.L)
         st.write(f"**Maximum Potential ABV:** {max_abv.asNumber():.2f}%")
-        st.write(f"**Maximum Sugar Content:** {max_sugar_content.asNumber(units.g/units.L):.2f} g/L")
+        st.write(f"**Maximum Sugar Content:** {max_sugar:.2f} g/L")
 
         fig, ax = plt.subplots()
+        # Benchmark wines
         for item in BENCHMARK:
             if item['abv'] is None:
-                ax.axhline(item['rs'].asNumber())
+                ax.axhline(item['rs'].asNumber(), color='black', alpha=.7)
                 ax.text(0, item['rs'].asNumber(), f"{item['name']}", color='black', verticalalignment='bottom')
             else:
-                print(item['abv'], item['rs'].asNumber())
-                ax.scatter(item['abv'], item['rs'].asNumber(), c='blue')
-                ax.text(item['abv'], item['rs'].asNumber(), f"{item['name']}", color='black', verticalalignment='bottom')
-        ax.scatter(desired_abv, resulting_sugar_content.asNumber(), c='green')
-        ax.text(desired_abv, resulting_sugar_content.asNumber(), "Calculation", color='green', verticalalignment='bottom')
-        ax.plot([0, max_abv], [max_sugar_content.asNumber(), 0], color='green', linestyle='--')
+                ax.scatter(item['abv'], item['rs'].asNumber(), c='lightskyblue')
+                ax.text(item['abv'], item['rs'].asNumber(), f"{item['name']}", color='blue', verticalalignment='bottom')
+
+        # Yeast vertical Lines
+        for item in YEAST:
+            ax.axvline(item['max_abv'], color='orange', alpha=.7)
+            ax.text(item['max_abv'], 0, f"{item['name']}", rotation=90, color='orange', verticalalignment='bottom')
+
+        resulting_sugar = resulting_sugar_content.asNumber(units.g/units.L)
+        ax.scatter(desired_abv, resulting_sugar, c='green')
+        ax.text(desired_abv, resulting_sugar, "Calculation", color='green', verticalalignment='bottom')
+        ax.plot([0, max_abv], [max_sugar, 0], color='green', linestyle='--')
         ax.set_ylabel("Residual Sugar (g/L)")
         ax.set_xlabel("ABV (%)")
         ax.set_xlim([0, None])
+        ax.set_ylim([0, None])
         st.pyplot(fig)
 
 
