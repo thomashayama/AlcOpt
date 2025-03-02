@@ -1,5 +1,10 @@
 # Run
 `docker compose up -d app`
+ 
+## Windows:
+`choco install make`
+
+`make local`
 
 # Install
 ## Option 1

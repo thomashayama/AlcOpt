@@ -3,3 +3,5 @@
 
 **.db
 secrets.toml
+
+.venv
