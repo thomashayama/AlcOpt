@@ -1,2 +1,5 @@
 **__pycache__
 **alcopt.egg-info
+
+**.db
+secrets.toml
