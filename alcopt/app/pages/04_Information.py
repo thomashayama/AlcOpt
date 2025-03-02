@@ -13,10 +13,11 @@ from alcopt.database.utils import get_db
 
 st.set_page_config(
     page_title="Information",
-    # page_icon="🍷",
+    page_icon="🍷",
 )
 
 def display_fermentation_info(db, fermentation):
+    """Displays fermentation info into streamlit"""
     st.subheader("Fermentation Details")
     st.write(f"**Fermentation ID:** {fermentation.id}")
     st.write(f"**Start Date:** {fermentation.start_date}")
@@ -75,6 +76,7 @@ def display_fermentation_info(db, fermentation):
     else:
         st.write("No specific gravity measurements yet.")
 
+
 def get_vessel_info(vessel_id):
     with get_db() as db:
         try:
@@ -88,16 +90,16 @@ def get_vessel_info(vessel_id):
 
             st.title(f"Vessel Information for Vessel ID: {vessel_id}")
 
+            if fermentation:
+                display_fermentation_info(db, fermentation)
+            else:
+                st.write("This vessel is not currently used in any fermentation.")
+
             st.subheader("Vessel Details")
             st.write(f"**Volume (liters):** {vessel.volume_liters}")
             st.write(f"**Material:** {vessel.material}")
             st.write(f"**Empty Mass:** {vessel.empty_mass}")
             st.write(f"**Date Added:** {vessel.date_added}")
-
-            if fermentation:
-                display_fermentation_info(db, fermentation)
-            else:
-                st.write("This vessel is not currently used in any fermentation.")
         except Exception as e:
             st.error(f"An error occurred: {e}")
 

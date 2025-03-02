@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-
+import numpy as np
 import matplotlib.pyplot as plt
 import mpld3
 import streamlit.components.v1 as components
@@ -39,7 +39,7 @@ from alcopt.database.utils import init_db, get_db
 
 st.set_page_config(
     page_title="Home",
-    page_icon="👋",
+    page_icon="🍷",
 )
 
 init_db()
@@ -135,16 +135,24 @@ with get_db() as db:
     
     st.markdown("## Rating vs ABV")
     ratings, abvs = zip(*get_ratings_abv_data())
+    m, b = np.polyfit(abvs, ratings, 1)
     fig = plt.figure() 
     plt.scatter(abvs, ratings) 
+    x = np.array([min(abvs), max(abvs)])
+    pred = m*x+b
+    plt.plot(x, pred, alpha=.6, color='black', linestyle=":")
     plt.xlabel('ABV (%)')
     plt.ylabel('Overall Rating')
     st.pyplot(fig)
     
     st.markdown("## Rating vs Residual Sugar")
     ratings, rss = zip(*get_ratings_rs_data())
+    m, b = np.polyfit(rss, ratings, 1)
     fig = plt.figure() 
     plt.scatter(rss, ratings) 
+    x = np.array([min(rss), max(rss)])
+    pred = m*x+b
+    plt.plot(x, pred, alpha=.6, color='black', linestyle=":")
     plt.xlabel('Residual Sugar (g/L)')
     plt.ylabel('Overall Rating')
     st.pyplot(fig)

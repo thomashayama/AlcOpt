@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
+from unum import units
 
 # SQL
 from sqlalchemy import asc
@@ -12,11 +13,12 @@ from sqlalchemy import asc
 from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db
-from alcopt.utils import sugar_to_abv, BENCHMARK
+from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
 from alcopt.auth import authenticate_user, get_user_role
 
 st.set_page_config(
     page_title="Brew Tracking",
+    page_icon="🍷",
 )
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []
@@ -42,6 +44,7 @@ def add_new_ingredient(db):
                 except Exception as e:
                     # st.error("Ingredient already in table!!")
                     st.error(e)
+
 
 def add_fermentation_ingredient(ingredient_name=None):
     """Add Ingredient to a fermentation"""
@@ -96,6 +99,7 @@ def add_fermentation_ingredient(ingredient_name=None):
                 except Exception as e:
                     st.error(f"Error {e}")
 
+
 def add_measurement_form(db):
     st.title("Add Specific Gravity Measurement")
 
@@ -128,6 +132,7 @@ def add_measurement_form(db):
             st.error(f"An error occurred: {e}")
             db.rollback()
 
+
 def rack_form(db):
     with st.form(key='rack_form'):
         col_from, col_to = st.columns((1, 1))
@@ -153,6 +158,7 @@ def rack_form(db):
             st.success(f"Racked from {from_vessel.id} to {to_vessel.id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+
 
 def bottle_form(db):
     with st.form(key='bottle_form'):
@@ -195,23 +201,55 @@ def bottle_form(db):
         db.commit()
         st.success(f"Vessel {vessel.id} Emptied")
 
+
+def get_volume(ingredients):
+    volume = 0*mL
+
+    for ingredient in ingredients:
+        ingredient_type = ingredient['ingredient_type'].lower()
+        if ingredient_type in ["liquid", "solvent"]:
+            unit = unit2str(ingredient['amount'])
+            if unit in VOLUME_UNITS:
+                volume += ingredient['amount']
+            elif unit in MASS_UNITS:
+                volume += ingredient['amount'] / ingredient['density']
+            else:
+                raise Exception(f"{unit} Not Implemented")
+
+    return volume
+
+
+def get_sugar(ingredients):
+    sugar = 0*units.g
+
+    for ingredient in ingredients:
+        ingredient_type = ingredient['ingredient_type'].lower()
+        if ingredient['sugar_content'] is not None:
+            if ingredient_type in ["liquid", "solvent"]:
+                unit = unit2str(ingredient['amount'])
+                if unit in VOLUME_UNITS:
+                    sugar += ingredient['amount'] * ingredient['sugar_content']
+                elif unit in MASS_UNITS:
+                    sugar += ingredient['amount'] * ingredient['sugar_content'] / ingredient['density']
+                else:
+                    raise Exception(f"{unit} Not Implemented")
+            elif ingredient_type in ["solid", "solute"]:
+                sugar += ingredient['amount'] * ingredient['sugar_content']
+    
+    return sugar
+
+
 def calculate_max_potential_abv(ingredients):
     # Constants for calculation
-    total_sugar_grams = sum(
-        ingredient['amount'] * ingredient['sugar_content'] * (ingredient['density'] if ingredient['unit'] == 'mL' else 1)
-        for ingredient in ingredients if ingredient['sugar_content'] is not None
-    )
+    total_sugar = get_sugar(ingredients)
+    fermentation_volume = get_volume(ingredients)
     
-    fermentation_volume = sum(
-        ingredient['amount'] * (1 if ingredient['unit'] == 'mL' else 1 / ingredient['density'])
-        for ingredient in ingredients if ingredient['ingredient_type'] != "Solute"
-    )
-
-    if fermentation_volume > 0:
-        max_potential_abv = sugar_to_abv(total_sugar_grams / fermentation_volume)
-        return max_potential_abv, total_sugar_grams / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
+    if fermentation_volume > 0*mL:
+        max_potential_abv = sugar_to_abv(total_sugar / fermentation_volume)
+        return max_potential_abv, total_sugar / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
     else:
         return 0, 0, fermentation_volume  # Avoid division by zero
+
 
 def display_ingredient_calculator():
     st.title("Fermentation Ingredient Calculator")
@@ -225,11 +263,11 @@ def display_ingredient_calculator():
             st.error("No vessel found with the given ID.")
             return
 
-        max_vessel_volume = vessel.volume_liters
+        max_vessel_volume = vessel.volume_liters*units.L
 
         ingredients = db.query(Ingredient).all()
 
-    st.write(f"Maximum Vessel Volume: {max_vessel_volume:.2f} liters")
+    st.write(f"Maximum Vessel Volume: {max_vessel_volume.asNumber(units.L):.2f} L")
 
     # Select ingredients
     ingredient_options = {ingredient.name: ingredient for ingredient in ingredients}
@@ -239,16 +277,16 @@ def display_ingredient_calculator():
     for name in selected_ingredient_names:
         ingredient = ingredient_options[name]
         col_unit, col_amount = st.columns([1, 3])
-        unit = col_unit.radio(f"Unit for {ingredient.name}", options=["g", "mL"], key=f"{ingredient.id}_unit")
+        unit = col_unit.selectbox(f"Unit for {ingredient.name}", options=["g", "mL"], key=f"{ingredient.id}_unit")
+        
         amount = col_amount.number_input(f"Amount of {ingredient.name} ({unit})", min_value=0.0, step=1.0, key=f"{ingredient.id}_amount")
         selected_ingredients.append({
             'id': ingredient.id,
             'name': ingredient.name,
-            'sugar_content': ingredient.sugar_content,
-            'amount': amount,
+            'sugar_content': ingredient.sugar_content * (1.0 if ingredient.ingredient_type in ["Solute", "Solid"] else units.g/units.L),
+            'amount': amount * str2unit[unit],
             'ingredient_type': ingredient.ingredient_type,
-            'density': ingredient.density,
-            'unit': unit,
+            'density': ingredient.density * units.kg/units.L,
         })
 
     # Calculate fermentation volume automatically from added ingredients
@@ -256,7 +294,7 @@ def display_ingredient_calculator():
         max_abv, max_sugar_content, fermentation_volume = calculate_max_potential_abv(selected_ingredients)
 
         # Display current volume taken up by added ingredients
-        st.write(f"Current Total Volume: {fermentation_volume:.2f} liters")
+        st.write(f"Current Total Volume: {fermentation_volume.asNumber(units.L)} liters")
 
         # Check if the maximum volume is exceeded
         if fermentation_volume > max_vessel_volume * 1000:
@@ -270,30 +308,40 @@ def display_ingredient_calculator():
             return
 
         # Slider for the desired ABV
-        desired_abv = st.slider("Desired ABV (%)", min_value=0.0, max_value=max_abv, step=0.1, key="desired_abv")
+        desired_abv = st.slider("Desired ABV (%)", min_value=0.0, max_value=float(max_abv), step=0.1, key="desired_abv")
 
         # Calculate and display the resulting sugar content based on the desired ABV
-        resulting_sugar_content = max_sugar_content - desired_abv * 17
-        st.write(f"**Resulting Sugar Content:** {resulting_sugar_content:.2f} g/L")
+        resulting_sugar_content = max_sugar_content - abv_to_sugar(desired_abv)
+        st.write(f"**Resulting Sugar Content:** {resulting_sugar_content.asNumber(units.g/units.L):.2f} g/L")
 
         # Display maximum potential ABV and corresponding sugar content
-        st.write(f"**Maximum Potential ABV:** {max_abv:.2f}%")
-        st.write(f"**Maximum Sugar Content:** {max_sugar_content:.2f} g/L")
+        max_sugar = max_sugar_content.asNumber(units.g/units.L)
+        st.write(f"**Maximum Potential ABV:** {max_abv.asNumber():.2f}%")
+        st.write(f"**Maximum Sugar Content:** {max_sugar:.2f} g/L")
 
         fig, ax = plt.subplots()
+        # Benchmark wines
         for item in BENCHMARK:
             if item['abv'] is None:
-                ax.axhline(item['rs'])
-                ax.text(0, item['rs'], f"{item['name']}", color='black', verticalalignment='bottom')
+                ax.axhline(item['rs'].asNumber(), color='black', alpha=.7)
+                ax.text(0, item['rs'].asNumber(), f"{item['name']}", color='black', verticalalignment='bottom')
             else:
-                ax.scatter(item['abv'], item['rs'], c='blue')
-                ax.text(item['abv'], item['rs'], f"{item['name']}", color='black', verticalalignment='bottom')
-        ax.scatter(desired_abv, resulting_sugar_content, c='green')
-        ax.text(desired_abv, resulting_sugar_content, "Calculation", color='green', verticalalignment='bottom')
-        ax.plot([0, max_abv], [max_sugar_content, 0], color='green', linestyle='--')
+                ax.scatter(item['abv'], item['rs'].asNumber(), c='lightskyblue')
+                ax.text(item['abv'], item['rs'].asNumber(), f"{item['name']}", color='blue', verticalalignment='bottom')
+
+        # Yeast vertical Lines
+        for item in YEAST:
+            ax.axvline(item['max_abv'], color='orange', alpha=.7)
+            ax.text(item['max_abv'], 0, f"{item['name']}", rotation=90, color='orange', verticalalignment='bottom')
+
+        resulting_sugar = resulting_sugar_content.asNumber(units.g/units.L)
+        ax.scatter(desired_abv, resulting_sugar, c='green')
+        ax.text(desired_abv, resulting_sugar, "Calculation", color='green', verticalalignment='bottom')
+        ax.plot([0, max_abv], [max_sugar, 0], color='green', linestyle='--')
         ax.set_ylabel("Residual Sugar (g/L)")
         ax.set_xlabel("ABV (%)")
         ax.set_xlim([0, None])
+        ax.set_ylim([0, None])
         st.pyplot(fig)
 
 

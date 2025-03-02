@@ -1,0 +1,14 @@
+# Dockerfile for a dnsmasq container
+FROM ubuntu:20.04
+
+# Install dnsmasq
+RUN apt-get update && apt-get install -y dnsmasq && apt-get clean
+
+# Copy the configuration file into the container
+COPY dnsmasq.conf /etc/dnsmasq.conf
+
+# Expose the default DNS port
+EXPOSE 53/udp
+
+# Start dnsmasq in the foreground
+CMD ["dnsmasq", "-k"]
