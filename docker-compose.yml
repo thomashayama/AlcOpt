@@ -7,6 +7,8 @@ services:
       - 8912:8501
     volumes:
       - .:/app
+    environment:
+      - SECRETS_FILE=/app/secrets.toml
     command: "python /app/run_app.py"
     restart: unless-stopped
     # depends_on:

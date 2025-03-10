@@ -9,33 +9,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import streamlit as st
-from streamlit_oauth import OAuth2Component
 import os
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = "http://localhost:8501"
-
-oauth2 = OAuth2Component(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "https://accounts.google.com/o/oauth2/auth", "https://oauth2.googleapis.com/token")
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-if st.session_state.user is None:
-    result = oauth2.authorize_button("Login with Google", REDIRECT_URI)
-    if result:
-        st.session_state.user = result.get("userinfo", {}).get("email")
-        st.experimental_rerun()
-else:
-    st.sidebar.write(f"Logged in as: **{st.session_state.user}**")
-    if st.button("Logout"):
-        st.session_state.user = None
-        st.experimental_rerun()
-
 
 from alcopt.database.models import Fermentation, Review, Bottle, SpecificGravityMeasurement
 from alcopt.database.queries import get_fermentation_leaderboard
 from alcopt.database.utils import init_db, get_db
+from alcopt.auth import show_login_status
 
 st.set_page_config(
     page_title="Home",
@@ -43,6 +22,8 @@ st.set_page_config(
 )
 
 init_db()
+# Display login/logout button in the sidebar
+show_login_status()
 
 st.markdown(
     """

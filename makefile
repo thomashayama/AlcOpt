@@ -3,6 +3,7 @@ PYTHON = python
 VENV_DIR = .venv
 SECRETS_FILE = secrets.toml
 APP_FILE = alcopt/app/Home.py
+DOCKER_COMPOSE = docker compose
 PORT = 8501
 
 # Detect OS for virtual environment activation
@@ -26,19 +27,25 @@ install:
 	@echo "Installing dependencies..."
 	$(ACTIVATE) && pip install -r requirements.txt
 
-# Run the Streamlit app with OAuth and secrets locally
+# Load secrets from secrets.toml and run Streamlit
 .PHONY: local
 local:
+	@echo "Loading secrets from $(SECRETS_FILE)..."
+	@$(foreach line,$(shell cat $(SECRETS_FILE) | grep -v '^#' | sed 's/ = /=/g'), $(EXPORT_CMD) $(line);)
 	@echo "Starting Streamlit locally with OAuth..."
 	$(ACTIVATE) && streamlit run $(APP_FILE) --server.port $(PORT) --server.fileWatcherType none
 
-# Deploy to Streamlit Cloud (if applicable)
+# Deploy with Docker Compose
 .PHONY: deploy
 deploy:
-	@echo "Deploying to Streamlit Cloud..."
-	@git add .
-	@git commit -m "Deploying Streamlit app"
-	@git push origin main
+	@echo "Deploying the app using Docker Compose..."
+	$(DOCKER_COMPOSE) up -d --build
+
+# Stop Docker Compose services
+.PHONY: stop
+stop:
+	@echo "Stopping Docker Compose services..."
+	$(DOCKER_COMPOSE) down
 
 # Clean virtual environment
 .PHONY: clean

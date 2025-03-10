@@ -4,11 +4,21 @@ import pandas as pd
 from alcopt.database.models import Fermentation, Bottle, Review, Vessel
 from alcopt.database.utils import get_db
 from alcopt.streamlit_utils import all_vessels_info, all_bottle_info
+from alcopt.auth import get_user_token, show_login_status
 
 st.set_page_config(
     page_title="Bottle Tracking",
     page_icon="🍷",
 )
+
+# Show login/logout button
+show_login_status()
+
+# Check if user is logged in
+token = get_user_token()
+if not token:
+    st.warning("🔒 Please log in to access this page.")
+    st.stop()
 
 if "last_data" not in st.session_state:
     st.session_state.last_data = {}

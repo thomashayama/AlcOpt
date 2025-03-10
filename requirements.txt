@@ -1,5 +1,5 @@
 streamlit
-streamlit_oauth
+streamlit-oauth
 pandas
 numpy
 mpld3

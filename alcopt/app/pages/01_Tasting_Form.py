@@ -2,18 +2,28 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from time import time
+from datetime import datetime
 
 # SQL
 from sqlalchemy import create_engine, asc, desc
 from sqlalchemy.orm import sessionmaker
 from alcopt.database.models import Fermentation, Bottle, Review
 from alcopt.database.utils import get_db
-from datetime import datetime
+from alcopt.auth import get_user_token, show_login_status
 
 st.set_page_config(
     page_title="Tasting Form",
     page_icon="🍷",
 )
+
+# Show login/logout button
+show_login_status()
+
+# Check if user is logged in
+token = get_user_token()
+if not token:
+    st.warning("🔒 Please log in to access this page.")
+    st.stop()
 
 with st.form("Tasting Form"):
     name = st.text_input("Full Name", placeholder="John Doe", autocomplete="on")
