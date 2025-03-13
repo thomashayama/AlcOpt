@@ -12,10 +12,8 @@ st.set_page_config(
 )
 
 # Show login/logout button
-show_login_status()
+token = show_login_status()
 
-# Check if user is logged in
-token = get_user_token()
 if not token:
     st.warning("🔒 Please log in to access this page.")
     st.stop()

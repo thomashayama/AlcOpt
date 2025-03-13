@@ -15,6 +15,63 @@ SCOPE = st.secrets["oauth"]["google"]["SCOPE"]
 # Initialize OAuth2
 oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, REFRESH_TOKEN_URL, REVOKE_TOKEN_URL)
 
+def logout():
+    """Clear user session and refresh."""
+    if "token" in st.session_state:
+        del st.session_state["token"]  # Remove stored token
+    if "profile_pic" in st.session_state:
+        del st.session_state["profile_pic"]  # Clear profile pic if stored
+    st.rerun()  # Rerun app to reflect logout state
+
+def show_login_status():
+    """Display login button or user profile in the sidebar"""
+
+    with st.sidebar:
+        st.markdown(
+            """
+            <style>
+                .profile-img {
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                }
+                .logout-button {
+                    border: none;
+                    background: none;
+                    color: red;
+                    cursor: pointer;
+                    font-size: 16px;
+                    padding: 5px;
+                }
+            </style>
+            <div class="header-container">
+        """,
+            unsafe_allow_html=True,
+        )
+
+        token = get_user_token()
+
+        if token:
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center;">
+                    <img src="{st.session_state.profile_pic}" class="profile-img">
+                    <form action="" method="post">
+                        <input type="submit" value="Logout" name="logout" class="logout-button">
+                    </form>
+                </div>
+                </div> <!-- End of header-container -->
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if st.session_state.get("logout"):
+                # del st.session_state["token"]
+                logout()
+                st.markdown('<meta http-equiv="refresh" content="0;URL=/alcopt">', unsafe_allow_html=True)
+
+    return token
+
 def get_user_token():
     """Handles OAuth2 login and returns the token."""
     if "token" not in st.session_state:
@@ -23,9 +80,11 @@ def get_user_token():
             st.session_state.token = result["token"]
             user_info = get_user_info(st.session_state["token"]["access_token"])
             if user_info:
-                st.session_state.user_email = user_info.get("email")
-                st.session_state.user_id = user_info.get("id")
-                print(st.session_state.user_email)
+                st.session_state.user_email = user_info.get("email", "Unknown User")
+                st.session_state.user_id = user_info.get("id", 0)
+                st.session_state.profile_pic = user_info.get("picture", "https://via.placeholder.com/50")
+            else:
+                st.session_state.profile_pic = "https://via.placeholder.com/50"
             st.rerun()
     return st.session_state.get("token")
 
@@ -41,12 +100,3 @@ def logout():
         del st.session_state["token"]
     st.rerun()
 
-def show_login_status():
-    """Shows login status and login/logout button in the sidebar."""
-    with st.sidebar:
-        if "token" in st.session_state:
-            st.write("✅ Logged in")
-            if st.button("Logout"):
-                logout()
-        else:
-            get_user_token()
