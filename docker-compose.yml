@@ -9,32 +9,20 @@ services:
       - .:/app
     environment:
       - SECRETS_FILE=/app/secrets.toml
-    command: "python /app/run_app.py"
+    command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py"]
+    # command: ["sleep", "infinity"]
     restart: unless-stopped
     # depends_on:
     #   - dnsmasq
 
   nginx:
-    build:
-      context: .
-      dockerfile: Dockerfile.nginx
+    image: nginx:latest
+    container_name: nginx-streamlit
     ports:
       - "80:80"
-    depends_on:
-      - app
-    networks:
-      - local-network
-
-  # dnsmasq:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.dns
-  #   container_name: dnsmasq
-  #   ports:
-  #     - "53:53/udp"  # Expose the DNS port
-  #   restart: unless-stopped
-  #   networks:
-  #     - local-network
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
 
 networks:
   local-network:

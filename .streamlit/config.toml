@@ -1,2 +1,2 @@
-[browser]
-# serverAddress = "test"
+[server]
+baseUrlPath = "alcopt"
