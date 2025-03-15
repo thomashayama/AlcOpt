@@ -22,10 +22,12 @@ token = show_login_status()
 # if not token:
 #     st.warning("🔒 Please log in to access this page.")
 #     st.stop()
-
+email = None
+if "user_email" in st.session_state:
+    email = st.session_state.user_email
 with st.form("Tasting Form"):
-    if "user_email" in st.session_state:
-        name = st.session_state.user_email
+    if email is not None:
+        name = email
     else:
         name = st.text_input("Full Name", placeholder="John Doe", autocomplete="on")
     bottle_id = st.number_input("Bottle ID", value=0, min_value=0, step=1)
@@ -73,27 +75,34 @@ with st.form("Tasting Form"):
                     st.success("Review added successfully!")
 
 with get_db() as db:
-    if is_admin():
-    reviews = db.query(Review).order_by(desc(Review.review_date)).all()
+    if email is not None:
+        if is_admin():
+            reviews = db.query(Review).order_by(desc(Review.review_date)).all()
+        else:
+            reviews = db.query(Review).filter(Review.name == email).order_by(desc(Review.review_date)).all()
 
-    # Convert to a list of dictionaries
-    reviews_list = [
-        {
-            'Name': review.name,
-            'Bottle ID': review.bottle_id,
-            'Overall Rating': review.overall_rating,
-            'Boldness': review.boldness,
-            'Tannicity': review.tannicity,
-            'Sweetness': review.sweetness,
-            'Acidity': review.acidity,
-            'Complexity': review.complexity,
-            'Review Date': review.review_date
-        }
-        for review in reviews
-    ]
+        # Convert to a list of dictionaries
+        reviews_list = [
+            {
+                'Name': review.name,
+                'Bottle ID': review.bottle_id,
+                'Overall Rating': review.overall_rating,
+                'Boldness': review.boldness,
+                'Tannicity': review.tannicity,
+                'Sweetness': review.sweetness,
+                'Acidity': review.acidity,
+                'Complexity': review.complexity,
+                'Review Date': review.review_date
+            }
+            for review in reviews
+        ]
 
-    # Convert list of dictionaries to a DataFrame
-    reviews_df = pd.DataFrame(reviews_list)
+        # Convert list of dictionaries to a DataFrame
+        reviews_df = pd.DataFrame(reviews_list)
 
-    # Display the DataFrame
-    st.dataframe(reviews_df, use_container_width=True, hide_index=True)
+        # Display the DataFrame
+        st.dataframe(reviews_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Log in to display your review history.")
+
+    
