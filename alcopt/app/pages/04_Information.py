@@ -10,11 +10,15 @@ from datetime import datetime
 from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
 from alcopt.utils import sg_diff_to_abv, BENCHMARK
 from alcopt.database.utils import get_db
+from alcopt.auth import show_login_status
 
 st.set_page_config(
     page_title="Information",
     page_icon="🍷",
 )
+
+# Show login/logout button
+token = show_login_status()
 
 def display_fermentation_info(db, fermentation):
     """Displays fermentation info into streamlit"""

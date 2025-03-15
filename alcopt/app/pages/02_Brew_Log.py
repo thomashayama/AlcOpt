@@ -14,7 +14,7 @@ from alcopt.database.models import Fermentation, SpecificGravityMeasurement, Fer
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db
 from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
-from alcopt.auth import get_user_token, show_login_status
+from alcopt.auth import get_user_token, show_login_status, is_admin
 
 st.set_page_config(
     page_title="Brew Tracking",
@@ -27,7 +27,6 @@ token = show_login_status()
 if not token:
     st.warning("🔒 Please log in to access this page.")
     st.stop()
-
 
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []
@@ -354,36 +353,39 @@ def display_ingredient_calculator():
         st.pyplot(fig)
 
 
-tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
+if is_admin():
+    tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
 
-with get_db() as db:
-    with tab_ingredient:
-        # Query and choose ingredient added
-        ingredient_names = [i.name for i in db.query(Ingredient).order_by(asc(Ingredient.name)).all()]
+    with get_db() as db:
+        with tab_ingredient:
+            # Query and choose ingredient added
+            ingredient_names = [i.name for i in db.query(Ingredient).order_by(asc(Ingredient.name)).all()]
 
-        options = ingredient_names + ["*New Ingredient"]
-        ingredient_name = st.selectbox("Ingredient Added", options=options)
+            options = ingredient_names + ["*New Ingredient"]
+            ingredient_name = st.selectbox("Ingredient Added", options=options)
 
-        # Create text input for user entry
-        if ingredient_name == "*New Ingredient": 
-            add_new_ingredient(db)
-        
-        add_fermentation_ingredient(ingredient_name=ingredient_name)
+            # Create text input for user entry
+            if ingredient_name == "*New Ingredient": 
+                add_new_ingredient(db)
+            
+            add_fermentation_ingredient(ingredient_name=ingredient_name)
 
-        st.dataframe(all_ferm_ingredients_info(db)[::-1], hide_index=True)
+            st.dataframe(all_ferm_ingredients_info(db)[::-1], hide_index=True)
 
 
-    with tab_measurement:
-        add_measurement_form(db)
-        st.dataframe(all_measurement_info(db)[::-1], hide_index=True)
+        with tab_measurement:
+            add_measurement_form(db)
+            st.dataframe(all_measurement_info(db)[::-1], hide_index=True)
 
-    with tab_rack:
-        rack_form(db)
-        st.dataframe(all_vessel_log_info(db)[::-1], hide_index=True)
+        with tab_rack:
+            rack_form(db)
+            st.dataframe(all_vessel_log_info(db)[::-1], hide_index=True)
 
-    with tab_bottle:
-        bottle_form(db)
-        st.dataframe(all_bottle_info(db), hide_index=True)
+        with tab_bottle:
+            bottle_form(db)
+            st.dataframe(all_bottle_info(db), hide_index=True)
 
-    with tab_calc:
-        display_ingredient_calculator()
+        with tab_calc:
+            display_ingredient_calculator()
+else:
+    st.markdown("Admin Page")

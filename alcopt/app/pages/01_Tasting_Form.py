@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, asc, desc
 from sqlalchemy.orm import sessionmaker
 from alcopt.database.models import Fermentation, Bottle, Review
 from alcopt.database.utils import get_db
-from alcopt.auth import get_user_token, show_login_status
+from alcopt.auth import get_user_token, show_login_status, is_admin
 
 st.set_page_config(
     page_title="Tasting Form",
@@ -19,12 +19,15 @@ st.set_page_config(
 # Show login/logout button
 token = show_login_status()
 
-if not token:
-    st.warning("🔒 Please log in to access this page.")
-    st.stop()
+# if not token:
+#     st.warning("🔒 Please log in to access this page.")
+#     st.stop()
 
 with st.form("Tasting Form"):
-    name = st.text_input("Full Name", placeholder="John Doe", autocomplete="on")
+    if "user_email" in st.session_state:
+        name = st.session_state.user_email
+    else:
+        name = st.text_input("Full Name", placeholder="John Doe", autocomplete="on")
     bottle_id = st.number_input("Bottle ID", value=0, min_value=0, step=1)
     date = st.date_input("Tasting Date")
     overall_rating = st.slider("Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=.1)
@@ -70,6 +73,7 @@ with st.form("Tasting Form"):
                     st.success("Review added successfully!")
 
 with get_db() as db:
+    if is_admin():
     reviews = db.query(Review).order_by(desc(Review.review_date)).all()
 
     # Convert to a list of dictionaries

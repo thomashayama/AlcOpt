@@ -100,3 +100,6 @@ def logout():
         del st.session_state["token"]
     st.rerun()
 
+def is_admin():
+    """Checks if current user is admin"""
+    return st.session_state.user_email in st.secrets["security"]["admin"]
