@@ -1,6 +1,4 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
 from time import time
 from datetime import datetime
 
@@ -10,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from alcopt.database.models import Fermentation, Bottle, Review
 from alcopt.database.utils import get_db
 from alcopt.auth import get_user_token, show_login_status, is_admin
+from alcopt.utils import reviews_to_df, plot_correlation_heatmap, plot_sweetness_vs_rating, plot_user_rating_distribution
 
 st.set_page_config(
     page_title="Tasting Form",
@@ -97,37 +96,33 @@ with st.form("Tasting Form"):
                     db.commit()
 
                     st.success("Review added successfully!")
+                    
+
 
 with get_db() as db:
     if email is not None:
         st.markdown("## Your Review History")
-        # Get all reviews
-        if is_admin():
-            reviews = db.query(Review).order_by(desc(Review.review_date)).all()
-        else:
-            reviews = db.query(Review).filter(Review.name == email).order_by(desc(Review.review_date)).all()
+        user_reviews = db.query(Review).filter(Review.name == email).order_by(desc(Review.review_date)).all()
 
-        # Convert to a list of dictionaries
-        reviews_list = [
-            {
-                'Name': review.name,
-                'Bottle ID': review.bottle_id,
-                'Overall Rating': review.overall_rating,
-                'Boldness': review.boldness,
-                'Tannicity': review.tannicity,
-                'Sweetness': review.sweetness,
-                'Acidity': review.acidity,
-                'Complexity': review.complexity,
-                'Review Date': review.review_date
-            }
-            for review in reviews
-        ]
-
-        # Convert list of dictionaries to a DataFrame
-        reviews_df = pd.DataFrame(reviews_list)
+        user_reviews_df = reviews_to_df(user_reviews)
 
         # Display the DataFrame
-        st.dataframe(reviews_df, use_container_width=True, hide_index=True)
+        st.dataframe(user_reviews_df, use_container_width=True, hide_index=True)
+
+        st.pyplot(plot_correlation_heatmap(user_reviews_df))
+
+        # Get all reviews
+        if is_admin():
+            st.markdown("## All Review History")
+            reviews = db.query(Review).order_by(desc(Review.review_date)).all()
+
+            reviews_df = reviews_to_df(reviews)
+
+            # Display the DataFrame
+            st.dataframe(reviews_df, use_container_width=True, hide_index=True)
+            st.pyplot(plot_correlation_heatmap(reviews_df))
+            st.pyplot(plot_sweetness_vs_rating(reviews_df))
+            st.pyplot(plot_user_rating_distribution(reviews_df))
     else:
         st.info("Log in to display your review history.")
 

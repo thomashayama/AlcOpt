@@ -15,6 +15,7 @@ from alcopt.database.models import Fermentation, Review, Bottle, SpecificGravity
 from alcopt.database.queries import get_fermentation_leaderboard
 from alcopt.database.utils import init_db, get_db
 from alcopt.auth import show_login_status
+from alcopt.utils import get_ratings_abv_data, get_ratings_rs_data
 
 st.set_page_config(
     page_title="Home",
@@ -35,66 +36,6 @@ st.markdown(
 st.markdown("## Mead Leaderboard")
 st.title("Fermentation Leaderboard")
 
-def sg_to_sugar(sg):
-    """
-    Convert specific gravity to sugar content in grams per liter.
-
-    Parameters:
-    sg (float): Specific gravity.
-
-    Returns:
-    float: Sugar content in grams per liter.
-    """
-    return (sg - 1) * 10_000
-
-def get_ratings_abv_data():
-    with get_db() as db:
-        data = db.query(
-            Review.overall_rating,
-            SpecificGravityMeasurement.fermentation_id,
-            func.max(SpecificGravityMeasurement.specific_gravity).label('initial_sg'),
-            func.min(SpecificGravityMeasurement.specific_gravity).label('final_sg')
-        ).join(
-            Bottle, Review.bottle_id == Bottle.id
-        ).join(
-            Fermentation, Bottle.fermentation_id == Fermentation.id
-        ).join(
-            SpecificGravityMeasurement, Fermentation.id == SpecificGravityMeasurement.fermentation_id
-        ).group_by(
-            Review.id
-        ).all()
-
-        ratings_abv = []
-        for row in data:
-            initial_sg = row.initial_sg
-            final_sg = row.final_sg
-            abv = (initial_sg - final_sg) * 131.25
-            ratings_abv.append((row.overall_rating, abv))
-
-        return ratings_abv
-
-def get_ratings_rs_data():
-    with get_db() as db:
-        data = db.query(
-            Review.overall_rating,
-            SpecificGravityMeasurement.fermentation_id,
-            func.min(SpecificGravityMeasurement.specific_gravity).label('final_sg')
-        ).join(
-            Bottle, Review.bottle_id == Bottle.id
-        ).join(
-            Fermentation, Bottle.fermentation_id == Fermentation.id
-        ).join(
-            SpecificGravityMeasurement, Fermentation.id == SpecificGravityMeasurement.fermentation_id
-        ).group_by(
-            Review.id
-        ).all()
-
-        ratings_rs = []
-        for row in data:
-            rs = sg_to_sugar(row.final_sg)
-            ratings_rs.append((row.overall_rating, rs))
-
-        return ratings_rs
 
 with get_db() as db:
     leaderboard_df = get_fermentation_leaderboard(db)
