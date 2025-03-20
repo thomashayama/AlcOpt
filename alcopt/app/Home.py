@@ -31,10 +31,6 @@ st.markdown(
 """
 )
 
-# st.page_link("pages/01_Tasting_Form.py", label="Tasting Form", icon="1️⃣")
-# st.page_link("pages/02_Brew_Log.py", label="Brew Logging", icon="2️⃣")
-# st.page_link("pages/03_Bottle_Log.py", label="Bottle Logging", icon="2️⃣")
-
 # Mead Average Ratings in a Leaderboard
 st.markdown("## Mead Leaderboard")
 st.title("Fermentation Leaderboard")

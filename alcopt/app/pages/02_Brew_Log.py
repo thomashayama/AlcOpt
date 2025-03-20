@@ -388,4 +388,4 @@ if is_admin():
         with tab_calc:
             display_ingredient_calculator()
 else:
-    st.markdown("Admin Page")
+    st.error("🔒Admin Page")

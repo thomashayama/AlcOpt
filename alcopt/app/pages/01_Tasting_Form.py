@@ -26,6 +26,30 @@ email = None
 if "user_email" in st.session_state:
     email = st.session_state.user_email
 with st.form("Tasting Form"):
+    # Inject CSS for larger slider
+    st.markdown(
+        """
+        <style>
+            /* Make slider thumb larger */
+            .stSlider > div[data-baseweb="slider"] > div {
+                padding: 20px 0px;
+            }
+
+            /* Make the track thicker */
+            .stSlider .rc-slider-track {
+                height: 10px !important;
+            }
+
+            /* Increase the size of the draggable circle */
+            .stSlider .rc-slider-handle {
+                width: 30px !important;
+                height: 130px !important;
+                margin-top: -12px !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     if email is not None:
         name = email
     else:
@@ -76,6 +100,8 @@ with st.form("Tasting Form"):
 
 with get_db() as db:
     if email is not None:
+        st.markdown("## Your Review History")
+        # Get all reviews
         if is_admin():
             reviews = db.query(Review).order_by(desc(Review.review_date)).all()
         else:

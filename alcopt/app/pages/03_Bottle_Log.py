@@ -56,4 +56,4 @@ if is_admin():
             
             st.dataframe(all_bottle_info(db), hide_index=True)
 else:
-    st.markdown("Admin Page")
+    st.error("🔒Admin Page")
