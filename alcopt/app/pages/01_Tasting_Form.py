@@ -1,6 +1,7 @@
 import streamlit as st
 from time import time
 from datetime import datetime
+import logging
 
 # SQL
 from sqlalchemy import create_engine, asc, desc
@@ -24,6 +25,8 @@ token = show_login_status()
 email = None
 if "user_email" in st.session_state:
     email = st.session_state.user_email
+else:
+    st.info("Recommend logging in")
 with st.form("Tasting Form"):
     # Inject CSS for larger slider
     st.markdown(
@@ -96,6 +99,7 @@ with st.form("Tasting Form"):
                     db.commit()
 
                     st.success("Review added successfully!")
+                    logging.info(f"Tasting Form Submitted by {name} for Bottle ID {bottle_id}")
                     
 
 

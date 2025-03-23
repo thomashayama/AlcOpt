@@ -6,24 +6,27 @@ services:
     ports:
       - 8912:8501
     volumes:
-      - .:/app
+      # - .:/app
+      - ./data:/data
     environment:
       - SECRETS_FILE=/app/secrets.toml
     command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py"]
     # command: ["sleep", "infinity"]
     restart: unless-stopped
-    # depends_on:
-    #   - dnsmasq
 
-  # nginx:
-  #   image: nginx:latest
-  #   container_name: nginx-streamlit
-  #   ports:
-  #     - "80:80"
-  #   volumes:
-  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  #   restart: unless-stopped
-
+  app-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8913:8501
+    volumes:
+      - .:/app
+      - ./data:/data
+    environment:
+      - SECRETS_FILE=/app/secrets.dev.toml
+    command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=watchdog"]
+    restart: unless-stopped
   
   nginx:
     build:

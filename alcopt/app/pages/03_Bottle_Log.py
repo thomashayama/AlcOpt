@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import logging
 
 from alcopt.database.models import Fermentation, Bottle, Review, Vessel
 from alcopt.database.utils import get_db
@@ -37,6 +38,7 @@ if is_admin():
                 db.add(new_vessel)
                 db.commit()
                 st.success("Vessel added successfully!")
+                logging.info(f"New vessel added: {new_vessel}")
             
             st.dataframe(all_vessels_info(db), use_container_width=True, hide_index=True)
 
@@ -53,6 +55,7 @@ if is_admin():
                 db.add(new_bottle)
                 db.commit()
                 st.success("Bottle added successfully!")
+                logging.info(f"New bottle added: {new_bottle}")
             
             st.dataframe(all_bottle_info(db), hide_index=True)
 else:

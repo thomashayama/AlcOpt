@@ -3,7 +3,11 @@
 
 **.db
 secrets.toml
+secrets-dev.toml
+secrets.dev.toml
 
 .venv
 
 build
+
+data/logs/*

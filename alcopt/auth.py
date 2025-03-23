@@ -1,16 +1,23 @@
 import requests
 import streamlit as st
 from streamlit_oauth import OAuth2Component
+from datetime import datetime, timedelta
+import toml
+import os
 
 # OAuth2 Configuration
-AUTHORIZE_URL = st.secrets["oauth"]["google"]["AUTHORIZE_URL"]
-TOKEN_URL = st.secrets["oauth"]["google"]["TOKEN_URL"]
-REFRESH_TOKEN_URL = st.secrets["oauth"]["google"]["REFRESH_TOKEN_URL"]
-REVOKE_TOKEN_URL = st.secrets["oauth"]["google"]["REVOKE_TOKEN_URL"]
-CLIENT_ID = st.secrets["oauth"]["google"]["CLIENT_ID"]
-CLIENT_SECRET = st.secrets["oauth"]["google"]["CLIENT_SECRET"]
-REDIRECT_URI = st.secrets["oauth"]["google"]["REDIRECT_URI"]
-SCOPE = st.secrets["oauth"]["google"]["SCOPE"]
+# Load secrets from the TOML file specified in the SECRETS_FILE environment variable
+secrets_file = os.getenv("SECRETS_FILE", "secrets.toml")
+secrets = toml.load(secrets_file)
+
+AUTHORIZE_URL = secrets["oauth"]["google"]["AUTHORIZE_URL"]
+TOKEN_URL = secrets["oauth"]["google"]["TOKEN_URL"]
+REFRESH_TOKEN_URL = secrets["oauth"]["google"]["REFRESH_TOKEN_URL"]
+REVOKE_TOKEN_URL = secrets["oauth"]["google"]["REVOKE_TOKEN_URL"]
+CLIENT_ID = secrets["oauth"]["google"]["CLIENT_ID"]
+CLIENT_SECRET = secrets["oauth"]["google"]["CLIENT_SECRET"]
+REDIRECT_URI = secrets["oauth"]["google"]["REDIRECT_URI"]
+SCOPE = secrets["oauth"]["google"]["SCOPE"]
 
 # Initialize OAuth2
 oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, REFRESH_TOKEN_URL, REVOKE_TOKEN_URL)
@@ -87,6 +94,17 @@ def get_user_token():
                 st.session_state.profile_pic = "https://via.placeholder.com/50"
             st.rerun()
     return st.session_state.get("token")
+
+def refresh_access_token():
+    if "token" not in st.session_state:
+        return False
+
+    token = oauth2.refresh_token(
+        refresh_token=st.session_state["token"],
+    )
+
+    st.session_state["token"] = token
+    return True
 
 def get_user_info(token):
     """Fetch user info from Google OAuth2."""

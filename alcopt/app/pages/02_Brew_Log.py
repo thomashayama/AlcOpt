@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 from unum import units
+import logging
 
 # SQL
 from sqlalchemy import asc
@@ -27,6 +28,7 @@ token = show_login_status()
 if not token:
     st.warning("🔒 Please log in to access this page.")
     st.stop()
+logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
 
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []
@@ -49,9 +51,11 @@ def add_new_ingredient(db):
                     new_ingredient = Ingredient(name=ingredient_name, sugar_content=sugar_content, ingredient_type=ingredient_type, density=density, price=price, notes=notes)
                     db.add(new_ingredient)
                     db.commit()
+                    logging.info(f"{st.session_state.user_email} added new ingredient: {ingredient_name}")
                 except Exception as e:
                     # st.error("Ingredient already in table!!")
                     st.error(e)
+                    logging.error(f"An error occurred: {e}")
 
 
 def add_fermentation_ingredient(ingredient_name=None):
@@ -104,8 +108,10 @@ def add_fermentation_ingredient(ingredient_name=None):
                         db.add(new_ferm_ingredient)
                         db.commit()
                         st.success(f"Created New Fermentation Ingredient <{new_ferm_ingredient.id}>")
+                        logging.info(f"{st.session_state.user_email} added ingredient: {ingredient_name} to vessel: {vessel_id}")
                 except Exception as e:
                     st.error(f"Error {e}")
+                    logging.error(f"An error occurred: {e}")
 
 
 def add_measurement_form(db):
@@ -136,8 +142,10 @@ def add_measurement_form(db):
                     db.add(new_measurement)
                     db.commit()
                     st.success(f"Measurement added successfully for Fermentation ID: {vessel.fermentation_id}")
+                    logging.info(f"{st.session_state.user_email} added measurement to vessel: {vessel_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
             db.rollback()
 
 
@@ -164,8 +172,10 @@ def rack_form(db):
             from_vessel.fermentation_id = None
             db.commit()
             st.success(f"Racked from {from_vessel.id} to {to_vessel.id}")
+            logging.info(f"{st.session_state.user_email} racked from vessel: {from_vessel_id} to vessel: {to_vessel_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
 
 def bottle_form(db):
@@ -200,8 +210,10 @@ def bottle_form(db):
             bottle.bottling_date = date
             db.commit()
             st.success(f"Bottled from Vessel {vessel.id} into Bottle {bottle.id}")
+            logging.info(f"{st.session_state.user_email} bottled from vessel: {vessel_id} to bottle: {bottle_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
     if st.button("Vessel Empty"):
         vessel = db.query(Vessel).filter_by(id=vessel_id).first()
@@ -354,6 +366,7 @@ def display_ingredient_calculator():
 
 
 if is_admin():
+    logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
     tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
 
     with get_db() as db:

@@ -121,7 +121,8 @@ def plot_correlation_heatmap(reviews_df):
 def plot_sweetness_vs_rating(reviews_df):
     """Plot average overall rating for each sweetness level."""
     fig = plt.figure(figsize=(8, 5))
-    sns.boxplot(x='Sweetness', y='Overall Rating', data=reviews_df, palette="coolwarm")
+    reviews_df['Sweetness'] = pd.to_numeric(reviews_df['Sweetness'], errors='coerce')
+    sns.boxplot(x='Sweetness', y='Overall Rating', data=reviews_df[['Sweetness', 'Overall Rating']], hue='Sweetness', palette="coolwarm")
     plt.xlabel('Sweetness Level')
     plt.ylabel('Overall Rating')
     plt.title('Effect of Sweetness on Overall Rating')
@@ -131,7 +132,8 @@ def plot_sweetness_vs_rating(reviews_df):
 def plot_user_rating_distribution(reviews_df):
     """Compare how different users rate wines."""
     fig = plt.figure(figsize=(10, 5))
-    sns.boxplot(x='Name', y='Overall Rating', data=reviews_df, palette="Set2")
+    reviews_df['Name'] = reviews_df['Name'].astype(str)
+    sns.boxplot(x='Name', y='Overall Rating', data=reviews_df, hue='Name', palette="Set2", dodge=False, legend=False)
     plt.xticks(rotation=70)
     plt.xlabel('User')
     plt.ylabel('Overall Rating')

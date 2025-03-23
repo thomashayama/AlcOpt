@@ -1,4 +1,6 @@
 from contextlib import contextmanager
+import toml
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -6,9 +8,15 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from alcopt.database.models import Base
 
-DATABASE_URL = 'sqlite:///alcopt.db'
+# Load secrets from the TOML file specified in the SECRETS_FILE environment variable
+secrets_file = os.getenv("SECRETS_FILE", "secrets.toml")
+secrets = toml.load(secrets_file)
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+DATABASE_URI = secrets["connections"]["alcopt_db"]["uri"]
+# 'sqlite:///alcopt.db'
+
+engine = create_engine(DATABASE_URI, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():

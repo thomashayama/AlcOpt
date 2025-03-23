@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpld3
 import streamlit.components.v1 as components
+import logging
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -20,6 +22,17 @@ from alcopt.utils import get_ratings_abv_data, get_ratings_rs_data
 st.set_page_config(
     page_title="Home",
     page_icon="🍷",
+)
+
+# Configure logging
+log_filename = f"/data/logs/log_{datetime.now().strftime('%Y-%m-%d')}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename),  # Log to a file with the current date
+        logging.StreamHandler()  # Log to the console
+    ]
 )
 
 init_db()
