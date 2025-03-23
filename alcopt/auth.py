@@ -120,4 +120,4 @@ def logout():
 
 def is_admin():
     """Checks if current user is admin"""
-    return st.session_state.user_email in st.secrets["security"]["admin"]
+    return st.session_state.user_email in secrets["security"]["admin"]
