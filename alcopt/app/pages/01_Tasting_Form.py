@@ -26,7 +26,13 @@ email = None
 if "user_email" in st.session_state:
     email = st.session_state.user_email
 else:
-    st.info("Recommend logging in")
+    col1, col2 = st.columns([2, 2])
+    with col1:
+        token = get_user_token(button_key="page_login")
+    if token:
+        st.rerun()
+    with col2:
+        st.info("Recommended to logging in")
 with st.form("Tasting Form"):
     # Inject CSS for larger slider
     st.markdown(
@@ -124,8 +130,6 @@ with get_db() as db:
 
             # Display the DataFrame
             st.dataframe(reviews_df, use_container_width=True, hide_index=True)
-            st.pyplot(plot_correlation_heatmap(reviews_df))
-            st.pyplot(plot_sweetness_vs_rating(reviews_df))
             st.pyplot(plot_user_rating_distribution(reviews_df))
     else:
         st.info("Log in to display your review history.")

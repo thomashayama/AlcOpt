@@ -79,10 +79,10 @@ def show_login_status():
 
     return token
 
-def get_user_token():
+def get_user_token(button_key="login"):
     """Handles OAuth2 login and returns the token."""
     if "token" not in st.session_state:
-        result = oauth2.authorize_button("Login with Google", REDIRECT_URI, SCOPE)
+        result = oauth2.authorize_button("Login with Google", REDIRECT_URI, SCOPE, key=button_key)
         if result and "token" in result:
             st.session_state.token = result["token"]
             user_info = get_user_info(st.session_state["token"]["access_token"])
