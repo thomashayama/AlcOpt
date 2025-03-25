@@ -40,7 +40,7 @@ init_db()
 show_login_status()
 
 st.markdown("""# AlcOpt""", help="Web App for recording tastings, brewing information, and tracking bottling.")
-st.markdown("[Go to Tasting Form](./Tasting_Form)", unsafe_allow_html=True)
+st.markdown('<a href="./Tasting_Form" target="_self">Go to Tasting Form</a>', unsafe_allow_html=True)
 
 # Fermentation Average Ratings in a Leaderboard
 st.markdown("## Fermentation Leaderboard")
