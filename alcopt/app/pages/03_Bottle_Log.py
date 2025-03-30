@@ -37,8 +37,8 @@ if is_admin():
                 new_vessel = Vessel(volume_liters=volume_liters, material=material, empty_mass=empty_mass, date_added=date)
                 db.add(new_vessel)
                 db.commit()
-                st.success("Vessel added successfully!")
-                logging.info(f"New vessel added: {new_vessel}")
+                st.success(f"Vessel {new_vessel.id} added successfully!")
+                logging.info(f"New vessel added: {new_vessel.id}")
             
             st.dataframe(all_vessels_info(db), use_container_width=True, hide_index=True)
 
@@ -54,8 +54,8 @@ if is_admin():
                 new_bottle = Bottle(volume_liters=volume_liters, empty_mass=empty_mass, date_added=date)
                 db.add(new_bottle)
                 db.commit()
-                st.success("Bottle added successfully!")
-                logging.info(f"New bottle added: {new_bottle}")
+                st.success(f"Bottle {new_bottle.id} added successfully!")
+                logging.info(f"New bottle added: {new_bottle.id}")
             
             st.dataframe(all_bottle_info(db), hide_index=True)
 else:
