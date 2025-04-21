@@ -30,7 +30,7 @@ def all_vessel_log_info(session):
     ]
     return pd.DataFrame(vessel_logs_list)
 
-def all_measurement_info(session):
+def all_sg_measurement_info(session):
     measurements = session.query(SpecificGravityMeasurement).all()
     measurements_list = [
         {

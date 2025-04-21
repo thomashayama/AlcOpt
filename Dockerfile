@@ -6,7 +6,7 @@ COPY . /app
 WORKDIR /app
 
 RUN pip install -r /app/requirements.txt
-RUN pip install /app
+RUN pip install -e /app
 
 # CMD [ "python", "app/run_app.py" ]
 # CMD ["sleep", "infinity"]

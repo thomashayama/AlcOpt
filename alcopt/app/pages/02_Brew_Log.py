@@ -11,9 +11,9 @@ import logging
 # SQL
 from sqlalchemy import asc
 
-from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog
-from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
-from alcopt.database.utils import get_db
+from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog, MassMeasurement
+from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_sg_measurement_info, all_bottle_info
+from alcopt.database.utils import get_db, all_mass_measurement_info
 from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
 from alcopt.auth import get_user_token, show_login_status, is_admin
 
@@ -114,7 +114,7 @@ def add_fermentation_ingredient(ingredient_name=None):
                     logging.error(f"An error occurred: {e}")
 
 
-def add_measurement_form(db):
+def add_sg_measurement_form(db):
     st.title("Add Specific Gravity Measurement")
 
     with st.form(key='measurement_form'):
@@ -143,6 +143,41 @@ def add_measurement_form(db):
                     db.commit()
                     st.success(f"Measurement added successfully for Fermentation ID: {vessel.fermentation_id}")
                     logging.info(f"{st.session_state.user_email} added measurement to vessel: {vessel_id}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
+            db.rollback()
+
+
+def add_mass_measurement_form(db):
+    st.title("Add Mass Measurement")
+
+    with st.form(key='mass_measurement_form'):
+        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+        measurement_date = st.date_input("Measurement Date", value=datetime.now())
+        mass = st.number_input("Mass (g)", value=0.0, min_value=0.0, step=0.1, format="%.1f")
+
+        submit_button = st.form_submit_button(label='Add Mass Measurement')
+
+    if submit_button:
+        try:
+            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
+            if vessel is None:
+                st.error(f"Vessel {vessel_id} not found")
+            else:
+                if vessel.fermentation_id is None:
+                    st.error(f"Vessel {vessel_id} doesn't have a fermentation")
+                else:
+                    # Add new mass measurement
+                    new_mass_measurement = MassMeasurement(
+                        fermentation_id=vessel.fermentation_id,
+                        measurement_date=measurement_date,
+                        mass=mass
+                    )
+                    db.add(new_mass_measurement)
+                    db.commit()
+                    st.success(f"Mass measurement added successfully for Fermentation ID: {vessel.fermentation_id}")
+                    logging.info(f"{st.session_state.user_email} added mass measurement to vessel: {vessel_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
             logging.error(f"An error occurred: {e}")
@@ -367,7 +402,7 @@ def display_ingredient_calculator():
 
 if is_admin():
     logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
-    tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
+    tab_ingredient, tab_measurement, tab_mass, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "SG", "Mass", "Rack", "Bottle", "Calculator"])
 
     with get_db() as db:
         with tab_ingredient:
@@ -387,8 +422,12 @@ if is_admin():
 
 
         with tab_measurement:
-            add_measurement_form(db)
-            st.dataframe(all_measurement_info(db)[::-1], hide_index=True)
+            add_sg_measurement_form(db)
+            st.dataframe(all_sg_measurement_info(db)[::-1], hide_index=True)
+
+        with tab_mass:
+            add_mass_measurement_form(db)
+            st.dataframe(all_mass_measurement_info(db)[::-1], hide_index=True)
 
         with tab_rack:
             rack_form(db)
