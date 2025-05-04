@@ -7,6 +7,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from unum import units
 import logging
+import traceback
 
 # SQL
 from sqlalchemy import asc
@@ -14,7 +15,7 @@ from sqlalchemy import asc
 from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog, MassMeasurement
 from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_sg_measurement_info, all_bottle_info
 from alcopt.database.utils import get_db, all_mass_measurement_info
-from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
+from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS, calculate_max_potential_abv
 from alcopt.auth import get_user_token, show_login_status, is_admin
 
 st.set_page_config(
@@ -53,7 +54,7 @@ def add_new_ingredient(db):
                     db.commit()
                     logging.info(f"{st.session_state.user_email} added new ingredient: {ingredient_name}")
                 except Exception as e:
-                    # st.error("Ingredient already in table!!")
+                    print(traceback.format_exc())
                     st.error(e)
                     logging.error(f"An error occurred: {e}")
 
@@ -255,55 +256,6 @@ def bottle_form(db):
         st.success(f"Vessel {vessel.id} Emptied")
 
 
-def get_volume(ingredients):
-    volume = 0*mL
-
-    for ingredient in ingredients:
-        ingredient_type = ingredient['ingredient_type'].lower()
-        if ingredient_type in ["liquid", "solvent"]:
-            unit = unit2str(ingredient['amount'])
-            if unit in VOLUME_UNITS:
-                volume += ingredient['amount']
-            elif unit in MASS_UNITS:
-                volume += ingredient['amount'] / ingredient['density']
-            else:
-                raise Exception(f"{unit} Not Implemented")
-
-    return volume
-
-
-def get_sugar(ingredients):
-    sugar = 0*units.g
-
-    for ingredient in ingredients:
-        ingredient_type = ingredient['ingredient_type'].lower()
-        if ingredient['sugar_content'] is not None:
-            if ingredient_type in ["liquid", "solvent"]:
-                unit = unit2str(ingredient['amount'])
-                if unit in VOLUME_UNITS:
-                    sugar += ingredient['amount'] * ingredient['sugar_content']
-                elif unit in MASS_UNITS:
-                    sugar += ingredient['amount'] * ingredient['sugar_content'] / ingredient['density']
-                else:
-                    raise Exception(f"{unit} Not Implemented")
-            elif ingredient_type in ["solid", "solute"]:
-                sugar += ingredient['amount'] * ingredient['sugar_content']
-    
-    return sugar
-
-
-def calculate_max_potential_abv(ingredients):
-    # Constants for calculation
-    total_sugar = get_sugar(ingredients)
-    fermentation_volume = get_volume(ingredients)
-    
-    if fermentation_volume > 0*mL:
-        max_potential_abv = sugar_to_abv(total_sugar / fermentation_volume)
-        return max_potential_abv, total_sugar / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
-    else:
-        return 0, 0, fermentation_volume  # Avoid division by zero
-
-
 def display_ingredient_calculator():
     st.title("Fermentation Ingredient Calculator")
 
@@ -400,7 +352,7 @@ def display_ingredient_calculator():
 
 if is_admin():
     logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
-    tab_ingredient, tab_measurement, tab_mass, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "SG", "Mass", "Rack", "Bottle", "Calculator"])
+    tab_ingredient, tab_calc, tab_measurement, tab_mass, tab_rack, tab_bottle = st.tabs(["Ingredient", "Calculator", "SG", "Mass", "Rack", "Bottle"])
 
     with get_db() as db:
         with tab_ingredient:
@@ -423,6 +375,9 @@ if is_admin():
             add_sg_measurement_form(db)
             st.dataframe(all_sg_measurement_info(db)[::-1], hide_index=True)
 
+        with tab_calc:
+            display_ingredient_calculator()
+
         with tab_mass:
             add_mass_measurement_form(db)
             st.dataframe(all_mass_measurement_info(db)[::-1], hide_index=True)
@@ -434,8 +389,5 @@ if is_admin():
         with tab_bottle:
             bottle_form(db)
             st.dataframe(all_bottle_info(db), hide_index=True)
-
-        with tab_calc:
-            display_ingredient_calculator()
 else:
     st.error("🔒Admin Page")
