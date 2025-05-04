@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
+import numpy as np
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
 
-from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
+from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review, BottleLog
 from alcopt.utils import sg_diff_to_abv, BENCHMARK
 from alcopt.database.utils import get_db
 from alcopt.auth import show_login_status
@@ -36,6 +37,19 @@ def display_fermentation_info(db, fermentation):
     else:
         st.write("No ingredients added yet.")
 
+    # Calculate yield TODO
+    # bottle_log = db.query(BottleLog).filter_by(fermentation_id=fermentation.id).all()
+    initial_volume = np.sum([ing.amount for ing in ingredients if ing.ingredient.ingredient_type == "Liquid"])
+    # final_volume = fermentation.final_volume_liters  # Assuming this field exists
+    final_mass = np.sum([b.amount - b.bottle.empty_mass for b in fermentation.bottle_logs if b.unit == "g"])# Assumes in g
+    st.markdown(f"**Initial Volume (liters):** {initial_volume:.2f}")
+    st.markdown(f"**Final Mass (grams):** {final_mass:.2f}")
+    
+    # Calculate cost TODO
+    total_cost = np.sum([ing.ingredient.price for ing in ingredients])
+    st.markdown(f"**Total Cost:** ${total_cost:.2f}")
+    st.markdown(f"**Cost per kg:** ${1000*total_cost/final_mass:.2f}")
+
     st.subheader("Specific Gravity Measurements")
     measurements = db.query(SpecificGravityMeasurement).filter_by(fermentation_id=fermentation.id).all()
     if measurements:
@@ -43,6 +57,8 @@ def display_fermentation_info(db, fermentation):
         final_sg = measurements[-1].specific_gravity
         abv = sg_diff_to_abv(initial_sg - final_sg)
         st.markdown(f"**~ABV (%)**: {abv:.2f}")
+        
+        
         measurements_df = pd.DataFrame([(m.measurement_date, m.specific_gravity, (m.measurement_date - fermentation.start_date).days) for m in measurements], columns=["Measurement Date", "Specific Gravity", "Days from Start"])
 
         fig, ax1 = plt.subplots()

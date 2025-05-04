@@ -85,6 +85,7 @@ class Bottle(Base):
     date_added = Column(Date, default=datetime.now())
     fermentation = relationship("Fermentation", back_populates="bottles")
     ingredients = relationship("BottleIngredient", back_populates="bottle")
+    bottle_logs = relationship("BottleLog", back_populates="bottle")
     reviews = relationship("Review", back_populates="bottle")
 
 class BottleIngredient(Base):
@@ -108,6 +109,7 @@ class BottleLog(Base):
     amount = Column(REAL)
     unit = Column(String)
     fermentation = relationship("Fermentation", back_populates="bottle_logs")
+    bottle = relationship("Bottle", back_populates="bottle_logs")
     vessel = relationship("Vessel")
 
 class Review(Base):

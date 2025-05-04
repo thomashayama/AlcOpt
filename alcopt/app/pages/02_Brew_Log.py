@@ -219,9 +219,7 @@ def bottle_form(db):
         bottle_id = st.number_input("Bottle ID", value=1, min_value=1, step=1)
         date = st.date_input("Date")
         col_start, col_end = st.columns([1, 1])
-        start_amount = col_start.number_input("Starting Amount", value=0.0, min_value=0.0)
-        end_amount = col_end.number_input("Ending Amount", value=0.0, min_value=0.0)
-        amount = end_amount - start_amount
+        amount = col_start.number_input("Total Amount", value=0.0, min_value=0.0)
         unit = st.text_input("Units", "g")
         submit_button = st.form_submit_button(label='Add Action')
 
