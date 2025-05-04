@@ -3,6 +3,7 @@ import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
@@ -31,7 +32,7 @@ def display_fermentation_info(db, fermentation):
     st.subheader("Ingredients")
     ingredients = db.query(FermentationIngredient).filter_by(fermentation_id=fermentation.id).all()
     if ingredients: 
-        ingredients_df = pd.DataFrame([(ing.ingredient.name, ing.amount, ing.unit, (ing.added_at - fermentation.start_date).days) for ing in ingredients], columns=["Ingredient", "Amount", "Unit", "Days from Start"])
+        ingredients_df = pd.DataFrame([(ing.ingredient.name, ing.amount, ing.unit, (ing.added_at - fermentation.start_date).days, ing.ingredient.price) for ing in ingredients], columns=["Ingredient", "Amount", "Unit", "Days from Start", "Price"])
         grouped_ingredients = ingredients_df.groupby(["Ingredient", "Days from Start"]).agg({"Amount": "sum", "Unit": "first"}).reset_index()
         st.dataframe(grouped_ingredients, hide_index=True)
     else:
@@ -46,7 +47,23 @@ def display_fermentation_info(db, fermentation):
     st.markdown(f"**Final Mass (grams):** {final_mass:.2f}")
     
     # Calculate cost TODO
-    total_cost = np.sum([ing.ingredient.price for ing in ingredients])
+    total_cost = 0.0
+    for ing in ingredients:
+        m = 1.0
+        if ing.ingredient.ingredient_type == "Liquid":
+            if ing.unit == "g":
+                m = 0.001 * ing.ingredient.density
+            m = 0.001
+        elif ing.ingredient.ingredient_type == "Solute":
+            if ing.unit == "g":
+                m = 0.001
+            elif ing.unit == "u":
+                m = 1.0
+            elif ing.unit == "tsp":
+                m = 0.00492892
+        else:
+            warnings.warn(f"Unknown ingredient type: {ing.ingredient.ingredient_type}")
+        total_cost += ing.ingredient.price * ing.amount * m # TODO Fix how units are handled
     st.markdown(f"**Total Cost:** ${total_cost:.2f}")
     st.markdown(f"**Cost per kg:** ${1000*total_cost/final_mass:.2f}")
 

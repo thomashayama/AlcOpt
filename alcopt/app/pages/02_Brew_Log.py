@@ -43,7 +43,7 @@ def add_new_ingredient(db):
         sugar_content = st.number_input("Sugar Content (g/L or g)", value=0.0)
         ingredient_type = st.radio("Type", ["Liquid", "Solute", "Solid"])
         density = st.number_input("Density (g/mL)", value=1.0)
-        price = st.number_input("Price ($/L or kg)", value=0.00)
+        price = st.number_input("Price ($/L, kg, or unit)", value=0.00)
         notes = st.text_input("Additional Notes")
         if st.form_submit_button('Add'):
             if ingredient_name is not None and ingredient_name != "":
