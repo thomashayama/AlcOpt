@@ -25,7 +25,7 @@ venv:
 .PHONY: install
 install:
 	@echo "Installing dependencies..."
-	$(ACTIVATE) && pip install -r requirements.txt
+	$(ACTIVATE) && pip install -r requirements.txt 
 
 # Load secrets from secrets.toml and run Streamlit
 .PHONY: local
