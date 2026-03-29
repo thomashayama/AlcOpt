@@ -1,4 +1,5 @@
 streamlit
+streamlit-oauth
 pandas
 numpy
 mpld3
@@ -7,6 +8,7 @@ SQLAlchemy
 opencv-python
 # git+https://github.com/trzemecki/Unum.git
 unum
+seaborn
 
 # SQL visualization
 # eralchemy

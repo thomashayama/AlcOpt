@@ -36,6 +36,7 @@ class Fermentation(Base):
     bottles = relationship("Bottle", back_populates="fermentation")
     bottle_logs = relationship("BottleLog", back_populates="fermentation")
     reviews = relationship("Review", back_populates="fermentation")
+    mass_measurements = relationship("MassMeasurement", back_populates="fermentation")
 
 class FermentationVesselLog(Base):
     __tablename__ = 'fermentation_vessel_logs'
@@ -66,6 +67,14 @@ class SpecificGravityMeasurement(Base):
     specific_gravity = Column(REAL)
     fermentation = relationship("Fermentation", back_populates="measurements")
 
+class MassMeasurement(Base):
+    __tablename__ = 'mass_measurements'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fermentation_id = Column(Integer, ForeignKey('fermentations.id'), nullable=False)
+    measurement_date = Column(Date, nullable=False)
+    mass = Column(REAL, nullable=False)
+    fermentation = relationship("Fermentation", back_populates="mass_measurements")
+
 class Bottle(Base):
     __tablename__ = 'bottles'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -76,6 +85,7 @@ class Bottle(Base):
     date_added = Column(Date, default=datetime.now())
     fermentation = relationship("Fermentation", back_populates="bottles")
     ingredients = relationship("BottleIngredient", back_populates="bottle")
+    bottle_logs = relationship("BottleLog", back_populates="bottle")
     reviews = relationship("Review", back_populates="bottle")
 
 class BottleIngredient(Base):
@@ -99,6 +109,7 @@ class BottleLog(Base):
     amount = Column(REAL)
     unit = Column(String)
     fermentation = relationship("Fermentation", back_populates="bottle_logs")
+    bottle = relationship("Bottle", back_populates="bottle_logs")
     vessel = relationship("Vessel")
 
 class Review(Base):

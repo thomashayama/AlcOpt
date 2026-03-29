@@ -2,19 +2,27 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
+import numpy as np
+import warnings
+import traceback
+from unum import units
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
 
-from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review
-from alcopt.utils import sg_diff_to_abv, BENCHMARK
+from alcopt.database.models import Vessel, Fermentation, FermentationIngredient, SpecificGravityMeasurement, Bottle, Review, BottleLog
+from alcopt.utils import sg_diff_to_abv, abv_to_sugar, get_sugar, BENCHMARK, mL
 from alcopt.database.utils import get_db
+from alcopt.auth import show_login_status
 
 st.set_page_config(
     page_title="Information",
     page_icon="🍷",
 )
+
+# Show login/logout button
+token = show_login_status()
 
 def display_fermentation_info(db, fermentation):
     """Displays fermentation info into streamlit"""
@@ -26,11 +34,41 @@ def display_fermentation_info(db, fermentation):
     st.subheader("Ingredients")
     ingredients = db.query(FermentationIngredient).filter_by(fermentation_id=fermentation.id).all()
     if ingredients: 
-        ingredients_df = pd.DataFrame([(ing.ingredient.name, ing.amount, ing.unit, (ing.added_at - fermentation.start_date).days) for ing in ingredients], columns=["Ingredient", "Amount", "Unit", "Days from Start"])
+        ingredients_df = pd.DataFrame([(ing.ingredient.name, ing.amount, ing.unit, (ing.added_at - fermentation.start_date).days, ing.ingredient.price) for ing in ingredients], columns=["Ingredient", "Amount", "Unit", "Days from Start", "Price"])
         grouped_ingredients = ingredients_df.groupby(["Ingredient", "Days from Start"]).agg({"Amount": "sum", "Unit": "first"}).reset_index()
         st.dataframe(grouped_ingredients, hide_index=True)
     else:
         st.write("No ingredients added yet.")
+
+    # Calculate yield TODO
+    # bottle_log = db.query(BottleLog).filter_by(fermentation_id=fermentation.id).all()
+    initial_volume = np.sum([ing.amount for ing in ingredients if ing.ingredient.ingredient_type == "Liquid"])
+    # final_volume = fermentation.final_volume_liters  # Assuming this field exists
+    final_mass = np.sum([b.amount - b.bottle.empty_mass for b in fermentation.bottle_logs if b.unit == "g"])# Assumes in g
+    st.markdown(f"**Initial Volume (mL):** {initial_volume:.2f}")
+    st.markdown(f"**Final Mass (g):** {final_mass:.2f}")
+    
+    # Calculate cost TODO
+    total_cost = 0.0
+    for ing in ingredients:
+        m = 1.0
+        if ing.ingredient.ingredient_type == "Liquid":
+            if ing.unit == "g":
+                m = 0.001 * ing.ingredient.density
+            m = 0.001
+        elif ing.ingredient.ingredient_type == "Solute":
+            if ing.unit == "g":
+                m = 0.001
+            elif ing.unit == "u":
+                m = 1.0
+            elif ing.unit == "tsp":
+                m = 0.00492892
+        else:
+            warnings.warn(f"Unknown ingredient type: {ing.ingredient.ingredient_type}")
+        total_cost += ing.ingredient.price * ing.amount * m # TODO Fix how units are handled
+    st.markdown(f"**Total Cost:** ${total_cost:.2f}")
+    if final_mass > 0:
+        st.markdown(f"**Cost per kg:** ${1000*total_cost/final_mass:.2f}")
 
     st.subheader("Specific Gravity Measurements")
     measurements = db.query(SpecificGravityMeasurement).filter_by(fermentation_id=fermentation.id).all()
@@ -38,7 +76,13 @@ def display_fermentation_info(db, fermentation):
         initial_sg = measurements[0].specific_gravity
         final_sg = measurements[-1].specific_gravity
         abv = sg_diff_to_abv(initial_sg - final_sg)
+        initial_rs = get_sugar(ingredients)/(initial_volume*mL)
+        rs_diff = abv_to_sugar(sg_diff_to_abv(initial_sg - final_sg))
+        residual_sugar = initial_rs - rs_diff
         st.markdown(f"**~ABV (%)**: {abv:.2f}")
+        st.markdown(f"**~Residual Sugar (g/L)**: {residual_sugar.asUnit(units.g/units.L).asNumber():.2f}")
+        
+        
         measurements_df = pd.DataFrame([(m.measurement_date, m.specific_gravity, (m.measurement_date - fermentation.start_date).days) for m in measurements], columns=["Measurement Date", "Specific Gravity", "Days from Start"])
 
         fig, ax1 = plt.subplots()
@@ -101,6 +145,7 @@ def get_vessel_info(vessel_id):
             st.write(f"**Empty Mass:** {vessel.empty_mass}")
             st.write(f"**Date Added:** {vessel.date_added}")
         except Exception as e:
+            traceback.print_exc()
             st.error(f"An error occurred: {e}")
 
 def get_bottle_info(bottle_id):
@@ -133,6 +178,7 @@ def get_bottle_info(bottle_id):
             else:
                 st.write("No reviews for this bottle yet.")
         except Exception as e:
+            traceback.print_exc()
             st.error(f"An error occurred: {e}")
 
 def vessel_info_form():

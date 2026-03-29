@@ -4,95 +4,47 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpld3
 import streamlit.components.v1 as components
+import logging
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+import streamlit as st
+import os
+
 from alcopt.database.models import Fermentation, Review, Bottle, SpecificGravityMeasurement
 from alcopt.database.queries import get_fermentation_leaderboard
 from alcopt.database.utils import init_db, get_db
+from alcopt.auth import show_login_status
+from alcopt.utils import get_ratings_abv_data, get_ratings_rs_data, reviews_to_df, plot_correlation_heatmap, plot_sweetness_vs_rating
 
 st.set_page_config(
     page_title="Home",
     page_icon="🍷",
 )
 
-init_db()
-
-st.markdown(
-    """
-    Web App for recording tastings, brewing information, and tracking bottling.
-"""
+# Configure logging
+log_filename = f"/data/logs/log_{datetime.now().strftime('%Y-%m-%d')}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename),  # Log to a file with the current date
+        logging.StreamHandler()  # Log to the console
+    ]
 )
 
-# st.page_link("pages/01_Tasting_Form.py", label="Tasting Form", icon="1️⃣")
-# st.page_link("pages/02_Brew_Log.py", label="Brew Logging", icon="2️⃣")
-# st.page_link("pages/03_Bottle_Log.py", label="Bottle Logging", icon="2️⃣")
+init_db()
+# Display login/logout button in the sidebar
+show_login_status()
 
-# Mead Average Ratings in a Leaderboard
-st.markdown("## Mead Leaderboard")
-st.title("Fermentation Leaderboard")
+st.markdown("""# AlcOpt""", help="Web App for recording tastings, brewing information, and tracking bottling.")
+st.markdown('<a href="./Tasting_Form" target="_self">Go to Tasting Form</a>', unsafe_allow_html=True)
 
-def sg_to_sugar(sg):
-    """
-    Convert specific gravity to sugar content in grams per liter.
+# Fermentation Average Ratings in a Leaderboard
+st.markdown("## Fermentation Leaderboard")
 
-    Parameters:
-    sg (float): Specific gravity.
-
-    Returns:
-    float: Sugar content in grams per liter.
-    """
-    return (sg - 1) * 10_000
-
-def get_ratings_abv_data():
-    with get_db() as db:
-        data = db.query(
-            Review.overall_rating,
-            SpecificGravityMeasurement.fermentation_id,
-            func.max(SpecificGravityMeasurement.specific_gravity).label('initial_sg'),
-            func.min(SpecificGravityMeasurement.specific_gravity).label('final_sg')
-        ).join(
-            Bottle, Review.bottle_id == Bottle.id
-        ).join(
-            Fermentation, Bottle.fermentation_id == Fermentation.id
-        ).join(
-            SpecificGravityMeasurement, Fermentation.id == SpecificGravityMeasurement.fermentation_id
-        ).group_by(
-            Review.id
-        ).all()
-
-        ratings_abv = []
-        for row in data:
-            initial_sg = row.initial_sg
-            final_sg = row.final_sg
-            abv = (initial_sg - final_sg) * 131.25
-            ratings_abv.append((row.overall_rating, abv))
-
-        return ratings_abv
-
-def get_ratings_rs_data():
-    with get_db() as db:
-        data = db.query(
-            Review.overall_rating,
-            SpecificGravityMeasurement.fermentation_id,
-            func.min(SpecificGravityMeasurement.specific_gravity).label('final_sg')
-        ).join(
-            Bottle, Review.bottle_id == Bottle.id
-        ).join(
-            Fermentation, Bottle.fermentation_id == Fermentation.id
-        ).join(
-            SpecificGravityMeasurement, Fermentation.id == SpecificGravityMeasurement.fermentation_id
-        ).group_by(
-            Review.id
-        ).all()
-
-        ratings_rs = []
-        for row in data:
-            rs = sg_to_sugar(row.final_sg)
-            ratings_rs.append((row.overall_rating, rs))
-
-        return ratings_rs
 
 with get_db() as db:
     leaderboard_df = get_fermentation_leaderboard(db)
@@ -100,34 +52,57 @@ with get_db() as db:
 
     # Plots
     reviews = db.query(Review).all()
+    reviews_df = reviews_to_df(reviews)
+
+    st.pyplot(plot_correlation_heatmap(reviews_df))
+    st.pyplot(plot_sweetness_vs_rating(reviews_df))
+    
     ratings = [review.overall_rating for review in reviews]
-    st.markdown("## Overall Ratings")
-    rating_hist = plt.figure()
-    plt.hist(ratings, bins=[1, 2, 3, 4, 5], edgecolor="black") 
-    plt.xlabel('Rating')
-    plt.ylabel('# Reviews')
+    rating_hist = plt.figure(figsize=(8, 5))
+    plt.hist(ratings, bins=np.arange(0.5, 6.5, 1), edgecolor="black", color="#4CAF50", alpha=0.8)
+    plt.xticks(range(1, 6))
+    plt.xlabel('Rating', fontsize=12)
+    plt.ylabel('# Reviews', fontsize=12)
+    plt.title('Distribution of Overall Ratings', fontsize=14, fontweight='bold')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
     st.pyplot(rating_hist)
     
-    st.markdown("## Rating vs ABV")
     ratings, abvs = zip(*get_ratings_abv_data())
     m, b = np.polyfit(abvs, ratings, 1)
-    fig = plt.figure() 
-    plt.scatter(abvs, ratings) 
+    # Create the figure and axis
+    fig, ax = plt.subplots(figsize=(8, 5))
+    # Scatter plot
+    scatter = ax.scatter(abvs, ratings, color="#1f77b4", edgecolor="black", alpha=0.8, label="Data Points")
+    # Regression line
     x = np.array([min(abvs), max(abvs)])
-    pred = m*x+b
-    plt.plot(x, pred, alpha=.6, color='black', linestyle=":")
-    plt.xlabel('ABV (%)')
-    plt.ylabel('Overall Rating')
+    pred = m * x + b
+    ax.plot(x, pred, color="red", linestyle="--", linewidth=2, label="Trend Line")
+    # Add labels, title, and grid
+    ax.set_xlabel('ABV (%)', fontsize=12)
+    ax.set_ylabel('Overall Rating', fontsize=12)
+    ax.set_title('Overall Rating vs ABV', fontsize=14, fontweight='bold')
+    ax.grid(axis='both', linestyle='--', alpha=0.7)
+    # Add legend
+    ax.legend(loc="best", fontsize=10)
+    # Display the plot
     st.pyplot(fig)
     
-    st.markdown("## Rating vs Residual Sugar")
     ratings, rss = zip(*get_ratings_rs_data())
     m, b = np.polyfit(rss, ratings, 1)
-    fig = plt.figure() 
-    plt.scatter(rss, ratings) 
+    # Create the figure and axis
+    fig, ax = plt.subplots(figsize=(8, 5))
+    # Scatter plot
+    scatter = ax.scatter(rss, ratings, color="#ff7f0e", edgecolor="black", alpha=0.8, label="Data Points")
+    # Regression line
     x = np.array([min(rss), max(rss)])
-    pred = m*x+b
-    plt.plot(x, pred, alpha=.6, color='black', linestyle=":")
-    plt.xlabel('Residual Sugar (g/L)')
-    plt.ylabel('Overall Rating')
+    pred = m * x + b
+    ax.plot(x, pred, color="red", linestyle="--", linewidth=2, label="Trend Line")
+    # Add labels, title, and grid
+    ax.set_xlabel('Residual Sugar (g/L)', fontsize=12)
+    ax.set_ylabel('Overall Rating', fontsize=12)
+    ax.set_title('Overall Rating vs Residual Sugar', fontsize=14, fontweight='bold')
+    ax.grid(axis='both', linestyle='--', alpha=0.7)
+    # Add legend
+    ax.legend(loc="best", fontsize=10)
+    # Display the plot
     st.pyplot(fig)

@@ -6,21 +6,36 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 from unum import units
+import logging
+import traceback
 
 # SQL
 from sqlalchemy import asc
 
-from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog
-from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_measurement_info, all_bottle_info
-from alcopt.database.utils import get_db
-from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS
+from alcopt.database.models import Fermentation, SpecificGravityMeasurement, FermentationIngredient, Ingredient, Vessel, FermentationVesselLog, Bottle, BottleLog, MassMeasurement
+from alcopt.streamlit_utils import all_ferm_ingredients_info, all_vessel_log_info, all_sg_measurement_info, all_bottle_info
+from alcopt.database.utils import get_db, all_mass_measurement_info
+from alcopt.utils import sugar_to_abv, abv_to_sugar, BENCHMARK, YEAST, mL, str2unit, unit2str, VOLUME_UNITS, MASS_UNITS, calculate_max_potential_abv
+from alcopt.auth import get_user_token, show_login_status, is_admin
 
 st.set_page_config(
     page_title="Brew Tracking",
     page_icon="🍷",
 )
+
+# Show login/logout button
+token = show_login_status()
+
+if not token:
+    st.warning("🔒 Please log in to access this page.")
+    st.stop()
+logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
+
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+    st.session_state.role = None
 
 
 def add_new_ingredient(db):
@@ -29,7 +44,7 @@ def add_new_ingredient(db):
         sugar_content = st.number_input("Sugar Content (g/L or g)", value=0.0)
         ingredient_type = st.radio("Type", ["Liquid", "Solute", "Solid"])
         density = st.number_input("Density (g/mL)", value=1.0)
-        price = st.number_input("Price ($/L or kg)", value=0.00)
+        price = st.number_input("Price ($/L, kg, or unit)", value=0.00)
         notes = st.text_input("Additional Notes")
         if st.form_submit_button('Add'):
             if ingredient_name is not None and ingredient_name != "":
@@ -37,9 +52,11 @@ def add_new_ingredient(db):
                     new_ingredient = Ingredient(name=ingredient_name, sugar_content=sugar_content, ingredient_type=ingredient_type, density=density, price=price, notes=notes)
                     db.add(new_ingredient)
                     db.commit()
+                    logging.info(f"{st.session_state.user_email} added new ingredient: {ingredient_name}")
                 except Exception as e:
-                    # st.error("Ingredient already in table!!")
+                    print(traceback.format_exc())
                     st.error(e)
+                    logging.error(f"An error occurred: {e}")
 
 
 def add_fermentation_ingredient(ingredient_name=None):
@@ -92,11 +109,13 @@ def add_fermentation_ingredient(ingredient_name=None):
                         db.add(new_ferm_ingredient)
                         db.commit()
                         st.success(f"Created New Fermentation Ingredient <{new_ferm_ingredient.id}>")
+                        logging.info(f"{st.session_state.user_email} added ingredient: {ingredient_name} to vessel: {vessel_id}")
                 except Exception as e:
                     st.error(f"Error {e}")
+                    logging.error(f"An error occurred: {e}")
 
 
-def add_measurement_form(db):
+def add_sg_measurement_form(db):
     st.title("Add Specific Gravity Measurement")
 
     with st.form(key='measurement_form'):
@@ -124,8 +143,45 @@ def add_measurement_form(db):
                     db.add(new_measurement)
                     db.commit()
                     st.success(f"Measurement added successfully for Fermentation ID: {vessel.fermentation_id}")
+                    logging.info(f"{st.session_state.user_email} added measurement to vessel: {vessel_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
+            db.rollback()
+
+
+def add_mass_measurement_form(db):
+    st.title("Add Mass Measurement")
+
+    with st.form(key='mass_measurement_form'):
+        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+        measurement_date = st.date_input("Measurement Date", value=datetime.now())
+        mass = st.number_input("Mass (g)", value=0.0, min_value=0.0, step=0.1, format="%.1f")
+
+        submit_button = st.form_submit_button(label='Add Mass Measurement')
+
+    if submit_button:
+        try:
+            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
+            if vessel is None:
+                st.error(f"Vessel {vessel_id} not found")
+            else:
+                if vessel.fermentation_id is None:
+                    st.error(f"Vessel {vessel_id} doesn't have a fermentation")
+                else:
+                    # Add new mass measurement
+                    new_mass_measurement = MassMeasurement(
+                        fermentation_id=vessel.fermentation_id,
+                        measurement_date=measurement_date,
+                        mass=mass
+                    )
+                    db.add(new_mass_measurement)
+                    db.commit()
+                    st.success(f"Mass measurement added successfully for Fermentation ID: {vessel.fermentation_id}")
+                    logging.info(f"{st.session_state.user_email} added mass measurement to vessel: {vessel_id}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
             db.rollback()
 
 
@@ -152,8 +208,10 @@ def rack_form(db):
             from_vessel.fermentation_id = None
             db.commit()
             st.success(f"Racked from {from_vessel.id} to {to_vessel.id}")
+            logging.info(f"{st.session_state.user_email} racked from vessel: {from_vessel_id} to vessel: {to_vessel_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
 
 def bottle_form(db):
@@ -162,9 +220,7 @@ def bottle_form(db):
         bottle_id = st.number_input("Bottle ID", value=1, min_value=1, step=1)
         date = st.date_input("Date")
         col_start, col_end = st.columns([1, 1])
-        start_amount = col_start.number_input("Starting Amount", value=0.0, min_value=0.0)
-        end_amount = col_end.number_input("Ending Amount", value=0.0, min_value=0.0)
-        amount = end_amount - start_amount
+        amount = col_start.number_input("Total Amount", value=0.0, min_value=0.0)
         unit = st.text_input("Units", "g")
         submit_button = st.form_submit_button(label='Add Action')
 
@@ -188,63 +244,16 @@ def bottle_form(db):
             bottle.bottling_date = date
             db.commit()
             st.success(f"Bottled from Vessel {vessel.id} into Bottle {bottle.id}")
+            logging.info(f"{st.session_state.user_email} bottled from vessel: {vessel_id} to bottle: {bottle_id}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
     if st.button("Vessel Empty"):
         vessel = db.query(Vessel).filter_by(id=vessel_id).first()
         vessel.fermentation_id = None
         db.commit()
         st.success(f"Vessel {vessel.id} Emptied")
-
-
-def get_volume(ingredients):
-    volume = 0*mL
-
-    for ingredient in ingredients:
-        ingredient_type = ingredient['ingredient_type'].lower()
-        if ingredient_type in ["liquid", "solvent"]:
-            unit = unit2str(ingredient['amount'])
-            if unit in VOLUME_UNITS:
-                volume += ingredient['amount']
-            elif unit in MASS_UNITS:
-                volume += ingredient['amount'] / ingredient['density']
-            else:
-                raise Exception(f"{unit} Not Implemented")
-
-    return volume
-
-
-def get_sugar(ingredients):
-    sugar = 0*units.g
-
-    for ingredient in ingredients:
-        ingredient_type = ingredient['ingredient_type'].lower()
-        if ingredient['sugar_content'] is not None:
-            if ingredient_type in ["liquid", "solvent"]:
-                unit = unit2str(ingredient['amount'])
-                if unit in VOLUME_UNITS:
-                    sugar += ingredient['amount'] * ingredient['sugar_content']
-                elif unit in MASS_UNITS:
-                    sugar += ingredient['amount'] * ingredient['sugar_content'] / ingredient['density']
-                else:
-                    raise Exception(f"{unit} Not Implemented")
-            elif ingredient_type in ["solid", "solute"]:
-                sugar += ingredient['amount'] * ingredient['sugar_content']
-    
-    return sugar
-
-
-def calculate_max_potential_abv(ingredients):
-    # Constants for calculation
-    total_sugar = get_sugar(ingredients)
-    fermentation_volume = get_volume(ingredients)
-    
-    if fermentation_volume > 0*mL:
-        max_potential_abv = sugar_to_abv(total_sugar / fermentation_volume)
-        return max_potential_abv, total_sugar / fermentation_volume, fermentation_volume  # Return max ABV, sugar content in g/L, and total volume
-    else:
-        return 0, 0, fermentation_volume  # Avoid division by zero
 
 
 def display_ingredient_calculator():
@@ -341,36 +350,44 @@ def display_ingredient_calculator():
         st.pyplot(fig)
 
 
-tab_ingredient, tab_measurement, tab_rack, tab_bottle, tab_calc = st.tabs(["Ingredient", "Measurement", "Rack", "Bottle", "Calculator"])
+if is_admin():
+    logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
+    tab_ingredient, tab_calc, tab_measurement, tab_mass, tab_rack, tab_bottle = st.tabs(["Ingredient", "Calculator", "SG", "Mass", "Rack", "Bottle"])
 
-with get_db() as db:
-    with tab_ingredient:
-        # Query and choose ingredient added
-        ingredient_names = [i.name for i in db.query(Ingredient).order_by(asc(Ingredient.name)).all()]
+    with get_db() as db:
+        with tab_ingredient:
+            # Query and choose ingredient added
+            ingredient_names = [i.name for i in db.query(Ingredient).order_by(asc(Ingredient.name)).all()]
 
-        options = ingredient_names + ["*New Ingredient"]
-        ingredient_name = st.selectbox("Ingredient Added", options=options)
+            options = ingredient_names + ["*New Ingredient"]
+            ingredient_name = st.selectbox("Ingredient Added", options=options)
 
-        # Create text input for user entry
-        if ingredient_name == "*New Ingredient": 
-            add_new_ingredient(db)
-        
-        add_fermentation_ingredient(ingredient_name=ingredient_name)
+            # Create text input for user entry
+            if ingredient_name == "*New Ingredient": 
+                add_new_ingredient(db)
+            
+            add_fermentation_ingredient(ingredient_name=ingredient_name)
 
-        st.dataframe(all_ferm_ingredients_info(db)[::-1], hide_index=True)
+            st.dataframe(all_ferm_ingredients_info(db)[::-1], hide_index=True)
 
 
-    with tab_measurement:
-        add_measurement_form(db)
-        st.dataframe(all_measurement_info(db)[::-1], hide_index=True)
+        with tab_measurement:
+            add_sg_measurement_form(db)
+            st.dataframe(all_sg_measurement_info(db)[::-1], hide_index=True)
 
-    with tab_rack:
-        rack_form(db)
-        st.dataframe(all_vessel_log_info(db)[::-1], hide_index=True)
+        with tab_calc:
+            display_ingredient_calculator()
 
-    with tab_bottle:
-        bottle_form(db)
-        st.dataframe(all_bottle_info(db), hide_index=True)
+        with tab_mass:
+            add_mass_measurement_form(db)
+            st.dataframe(all_mass_measurement_info(db)[::-1], hide_index=True)
 
-    with tab_calc:
-        display_ingredient_calculator()
+        with tab_rack:
+            rack_form(db)
+            st.dataframe(all_vessel_log_info(db)[::-1], hide_index=True)
+
+        with tab_bottle:
+            bottle_form(db)
+            st.dataframe(all_bottle_info(db), hide_index=True)
+else:
+    st.error("🔒Admin Page")

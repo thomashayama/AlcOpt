@@ -6,34 +6,32 @@ services:
     ports:
       - 8912:8501
     volumes:
-      - .:/app
-    command: "python /app/run_app.py"
+      - ./data:/data
+    environment:
+      - SECRETS_FILE=/app/secrets.toml
+    command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=none"]
     restart: unless-stopped
-    # depends_on:
-    #   - dnsmasq
-
-  nginx:
-    build:
-      context: .
-      dockerfile: Dockerfile.nginx
-    ports:
-      - "80:80"
-    depends_on:
-      - app
     networks:
-      - local-network
+      - thomashayama-net
 
-  # dnsmasq:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.dns
-  #   container_name: dnsmasq
-  #   ports:
-  #     - "53:53/udp"  # Expose the DNS port
-  #   restart: unless-stopped
-  #   networks:
-  #     - local-network
+  app-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8913:8501
+    volumes:
+      - .:/app
+      - ./data:/data
+    environment:
+      - SECRETS_FILE=/app/secrets.dev.toml
+    # command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=watchdog"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks:
+      - thomashayama-net
 
 networks:
-  local-network:
+  thomashayama-net:
     driver: bridge
+    external: true
