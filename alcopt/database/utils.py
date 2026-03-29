@@ -13,10 +13,13 @@ secrets_file = os.getenv("SECRETS_FILE", "secrets.toml")
 secrets = toml.load(secrets_file)
 
 
-DATABASE_URI = secrets["connections"]["alcopt_db"]["uri"]
-# 'sqlite:///alcopt.db'
+DATABASE_URI = os.getenv("DATABASE_URL") or secrets["connections"]["alcopt_db"]["uri"]
 
-engine = create_engine(DATABASE_URI, connect_args={"check_same_thread": False})
+connect_args = {}
+if DATABASE_URI.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
+
+engine = create_engine(DATABASE_URI, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
