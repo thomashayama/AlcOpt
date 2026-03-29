@@ -9,5 +9,4 @@ COPY . /alcopt
 RUN pip install -r /alcopt/requirements.txt
 RUN pip install /alcopt
 
-# CMD [ "python", "alcopt/run_app.py" ]
-# CMD ["sleep", "infinity"]
+CMD streamlit run /alcopt/alcopt/app/Home.py --server.port=$PORT --server.address=0.0.0.0
