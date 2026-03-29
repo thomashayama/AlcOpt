@@ -10,5 +10,7 @@ opencv-python
 unum
 seaborn
 
+psycopg2-binary
+
 # SQL visualization
 # eralchemy
