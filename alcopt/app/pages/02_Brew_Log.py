@@ -46,7 +46,9 @@ token = show_login_status()
 if not token:
     st.warning("🔒 Please log in to access this page.")
     st.stop()
-logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
+logging.info(
+    f"{st.session_state.get('user_email', 'unknown')} Accessed Brew Tracking Page"
+)
 
 if "new_ingredients" not in st.session_state:
     st.session_state.new_ingredients = []
@@ -254,6 +256,12 @@ def rack_form(db):
         try:
             from_vessel = db.query(Vessel).filter_by(id=from_vessel_id).first()
             to_vessel = db.query(Vessel).filter_by(id=to_vessel_id).first()
+            if not from_vessel:
+                st.error(f"Vessel {from_vessel_id} not found")
+                return
+            if not to_vessel:
+                st.error(f"Vessel {to_vessel_id} not found")
+                return
             vessel_log = FermentationVesselLog(
                 fermentation_id=from_vessel.fermentation_id,
                 vessel_id=to_vessel.id,
@@ -287,6 +295,12 @@ def bottle_form(db):
         try:
             vessel = db.query(Vessel).filter_by(id=vessel_id).first()
             bottle = db.query(Bottle).filter_by(id=bottle_id).first()
+            if not vessel:
+                st.error(f"Vessel {vessel_id} not found")
+                return
+            if not bottle:
+                st.error(f"Bottle {bottle_id} not found")
+                return
             bottle_log = BottleLog(
                 fermentation_id=vessel.fermentation_id,
                 bottle_id=bottle.id,
@@ -312,6 +326,9 @@ def bottle_form(db):
 
     if st.button("Vessel Empty"):
         vessel = db.query(Vessel).filter_by(id=vessel_id).first()
+        if not vessel:
+            st.error(f"Vessel {vessel_id} not found")
+            return
         vessel.fermentation_id = None
         db.commit()
         st.success(f"Vessel {vessel.id} Emptied")
@@ -469,7 +486,9 @@ def display_ingredient_calculator():
 
 
 if is_admin():
-    logging.info(f"{st.session_state.user_email} Accessed Brew Tracking Page")
+    logging.info(
+        f"{st.session_state.get('user_email', 'unknown')} Accessed Brew Tracking Page"
+    )
     tab_ingredient, tab_calc, tab_measurement, tab_mass, tab_rack, tab_bottle = st.tabs(
         ["Ingredient", "Calculator", "SG", "Mass", "Rack", "Bottle"]
     )

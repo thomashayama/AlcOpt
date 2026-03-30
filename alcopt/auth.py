@@ -131,4 +131,4 @@ def get_user_info(token):
 
 def is_admin():
     """Checks if current user is admin"""
-    return st.session_state.user_email in ADMIN_EMAILS
+    return st.session_state.get("user_email") in ADMIN_EMAILS

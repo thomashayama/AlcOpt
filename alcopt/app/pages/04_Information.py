@@ -91,7 +91,8 @@ def display_fermentation_info(db, fermentation):
         if ing.ingredient.ingredient_type == "Liquid":
             if ing.unit == "g":
                 m = 0.001 * ing.ingredient.density
-            m = 0.001
+            else:
+                m = 0.001
         elif ing.ingredient.ingredient_type == "Solute":
             if ing.unit == "g":
                 m = 0.001
