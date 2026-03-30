@@ -99,7 +99,11 @@ def add_fermentation_ingredient(ingredient_name=None):
                             vessel.fermentation_id = fermentation_id
                             db.commit()
                             st.success(f"Fermentation ID updated successfully for Vessel ID: {vessel_id}")
-                        ingredient_id = db.query(Ingredient).filter_by(name=ingredient_name).first().id
+                        ingredient = db.query(Ingredient).filter_by(name=ingredient_name).first()
+                        if ingredient is None:
+                            st.error(f"Ingredient '{ingredient_name}' not found")
+                            return
+                        ingredient_id = ingredient.id
                         new_ferm_ingredient = FermentationIngredient(
                             fermentation_id=fermentation_id, 
                             ingredient_id=ingredient_id, 

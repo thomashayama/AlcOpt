@@ -11,7 +11,7 @@ class Vessel(Base):
     volume_liters = Column(REAL)
     material = Column(String)
     empty_mass = Column(REAL)
-    date_added = Column(Date, default=datetime.now())
+    date_added = Column(Date, default=datetime.now)
     # fermentation = relationship("Fermentation", back_populates="bottles")
 
 class Ingredient(Base):
@@ -82,7 +82,7 @@ class Bottle(Base):
     bottling_date = Column(Date, nullable=True, default=None)
     volume_liters = Column(REAL)
     empty_mass = Column(REAL)
-    date_added = Column(Date, default=datetime.now())
+    date_added = Column(Date, default=datetime.now)
     fermentation = relationship("Fermentation", back_populates="bottles")
     ingredients = relationship("BottleIngredient", back_populates="bottle")
     bottle_logs = relationship("BottleLog", back_populates="bottle")

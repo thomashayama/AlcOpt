@@ -67,42 +67,46 @@ with get_db() as db:
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     st.pyplot(rating_hist)
     
-    ratings, abvs = zip(*get_ratings_abv_data())
-    m, b = np.polyfit(abvs, ratings, 1)
-    # Create the figure and axis
-    fig, ax = plt.subplots(figsize=(8, 5))
-    # Scatter plot
-    scatter = ax.scatter(abvs, ratings, color="#1f77b4", edgecolor="black", alpha=0.8, label="Data Points")
-    # Regression line
-    x = np.array([min(abvs), max(abvs)])
-    pred = m * x + b
-    ax.plot(x, pred, color="red", linestyle="--", linewidth=2, label="Trend Line")
-    # Add labels, title, and grid
-    ax.set_xlabel('ABV (%)', fontsize=12)
-    ax.set_ylabel('Overall Rating', fontsize=12)
-    ax.set_title('Overall Rating vs ABV', fontsize=14, fontweight='bold')
-    ax.grid(axis='both', linestyle='--', alpha=0.7)
-    # Add legend
-    ax.legend(loc="best", fontsize=10)
-    # Display the plot
-    st.pyplot(fig)
-    
-    ratings, rss = zip(*get_ratings_rs_data())
-    m, b = np.polyfit(rss, ratings, 1)
-    # Create the figure and axis
-    fig, ax = plt.subplots(figsize=(8, 5))
-    # Scatter plot
-    scatter = ax.scatter(rss, ratings, color="#ff7f0e", edgecolor="black", alpha=0.8, label="Data Points")
-    # Regression line
-    x = np.array([min(rss), max(rss)])
-    pred = m * x + b
-    ax.plot(x, pred, color="red", linestyle="--", linewidth=2, label="Trend Line")
-    # Add labels, title, and grid
-    ax.set_xlabel('Residual Sugar (g/L)', fontsize=12)
-    ax.set_ylabel('Overall Rating', fontsize=12)
-    ax.set_title('Overall Rating vs Residual Sugar', fontsize=14, fontweight='bold')
-    ax.grid(axis='both', linestyle='--', alpha=0.7)
-    # Add legend
-    ax.legend(loc="best", fontsize=10)
-    # Display the plot
-    st.pyplot(fig)
+    abv_data = get_ratings_abv_data()
+    if abv_data:
+        ratings, abvs = zip(*abv_data)
+        m, b = np.polyfit(abvs, ratings, 1)
+        # Create the figure and axis
+        fig, ax = plt.subplots(figsize=(8, 5))
+        # Scatter plot
+        scatter = ax.scatter(abvs, ratings, color="#1f77b4", edgecolor="black", alpha=0.8, label="Data Points")
+        # Regression line
+        x = np.array([min(abvs), max(abvs)])
+        pred = m * x + b
+        ax.plot(x, pred, color="red", linestyle="--", linewidth=2, label="Trend Line")
+        # Add labels, title, and grid
+        ax.set_xlabel('ABV (%)', fontsize=12)
+        ax.set_ylabel('Overall Rating', fontsize=12)
+        ax.set_title('Overall Rating vs ABV', fontsize=14, fontweight='bold')
+        ax.grid(axis='both', linestyle='--', alpha=0.7)
+        # Add legend
+        ax.legend(loc="best", fontsize=10)
+        # Display the plot
+        st.pyplot(fig)
+
+    rs_data = get_ratings_rs_data()
+    if rs_data:
+        ratings, rss = zip(*rs_data)
+        m, b = np.polyfit(rss, ratings, 1)
+        # Create the figure and axis
+        fig, ax = plt.subplots(figsize=(8, 5))
+        # Scatter plot
+        scatter = ax.scatter(rss, ratings, color="#ff7f0e", edgecolor="black", alpha=0.8, label="Data Points")
+        # Regression line
+        x = np.array([min(rss), max(rss)])
+        pred = m * x + b
+        ax.plot(x, pred, color="red", linestyle="--", linewidth=2, label="Trend Line")
+        # Add labels, title, and grid
+        ax.set_xlabel('Residual Sugar (g/L)', fontsize=12)
+        ax.set_ylabel('Overall Rating', fontsize=12)
+        ax.set_title('Overall Rating vs Residual Sugar', fontsize=14, fontweight='bold')
+        ax.grid(axis='both', linestyle='--', alpha=0.7)
+        # Add legend
+        ax.legend(loc="best", fontsize=10)
+        # Display the plot
+        st.pyplot(fig)

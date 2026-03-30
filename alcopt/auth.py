@@ -106,12 +106,6 @@ def get_user_info(token):
     response = requests.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers)
     return response.json() if response.status_code == 200 else None
 
-def logout():
-    """Removes token and logs the user out."""
-    if "token" in st.session_state:
-        del st.session_state["token"]
-    st.rerun()
-
 def is_admin():
     """Checks if current user is admin"""
     return st.session_state.user_email in ADMIN_EMAILS
