@@ -50,7 +50,7 @@ TABLES_IN_ORDER = [
     Review,
 ]
 
-SQLITE_PATH = Path(__file__).resolve().parent.parent / "data" / "alcopt.db"
+SQLITE_PATH = Path(__file__).resolve().parent.parent / "alcopt.db"
 
 
 def migrate(postgres_url: str):
