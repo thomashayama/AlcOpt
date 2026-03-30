@@ -71,6 +71,23 @@ All config via environment variables (see `.env.example`):
 - SQLite locally, PostgreSQL in production
 - Base URL path set to `/alcopt` in `.streamlit/config.toml`
 
+## Linting & Formatting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
+
+```bash
+# Check for lint issues
+ruff check alcopt/
+
+# Auto-fix lint issues
+ruff check --fix alcopt/
+
+# Format code
+ruff format alcopt/
+```
+
+Run `ruff check` and `ruff format` before committing. Both should pass with zero issues.
+
 ## Dependencies
 
 Core: streamlit, streamlit-oauth, sqlalchemy, pandas, numpy, matplotlib, seaborn, unum, opencv-python, psycopg2-binary

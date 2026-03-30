@@ -16,4 +16,6 @@ GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
 GOOGLE_SCOPE = os.getenv("GOOGLE_SCOPE", "openid email profile")
 
 # Security
-ADMIN_EMAILS = [e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
+ADMIN_EMAILS = [
+    e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
+]

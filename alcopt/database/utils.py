@@ -1,8 +1,7 @@
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 from alcopt.database.models import Base, MassMeasurement
 from alcopt.config import DATABASE_URL
@@ -16,10 +15,13 @@ if DATABASE_URI.startswith("sqlite"):
 engine = create_engine(DATABASE_URI, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 def init_db():
-    import alcopt.database.models  # Ensure models are imported
     Base.metadata.create_all(bind=engine)
+
+
 init_db()
+
 
 @contextmanager
 def get_db():
@@ -28,6 +30,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 def all_mass_measurement_info(db):
     return [

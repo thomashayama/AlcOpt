@@ -1,20 +1,29 @@
 import requests
 import streamlit as st
 from streamlit_oauth import OAuth2Component
-from datetime import datetime, timedelta
 
 from alcopt.config import (
-    GOOGLE_AUTHORIZE_URL, GOOGLE_TOKEN_URL, GOOGLE_REFRESH_TOKEN_URL,
-    GOOGLE_REVOKE_TOKEN_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI, GOOGLE_SCOPE, ADMIN_EMAILS,
+    GOOGLE_AUTHORIZE_URL,
+    GOOGLE_TOKEN_URL,
+    GOOGLE_REFRESH_TOKEN_URL,
+    GOOGLE_REVOKE_TOKEN_URL,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI,
+    GOOGLE_SCOPE,
+    ADMIN_EMAILS,
 )
 
 # Initialize OAuth2
 oauth2 = OAuth2Component(
-    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-    GOOGLE_AUTHORIZE_URL, GOOGLE_TOKEN_URL,
-    GOOGLE_REFRESH_TOKEN_URL, GOOGLE_REVOKE_TOKEN_URL,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_AUTHORIZE_URL,
+    GOOGLE_TOKEN_URL,
+    GOOGLE_REFRESH_TOKEN_URL,
+    GOOGLE_REVOKE_TOKEN_URL,
 )
+
 
 def logout():
     """Clear user session and refresh."""
@@ -23,6 +32,7 @@ def logout():
     if "profile_pic" in st.session_state:
         del st.session_state["profile_pic"]  # Clear profile pic if stored
     st.rerun()  # Rerun app to reflect logout state
+
 
 def show_login_status():
     """Display login button or user profile in the sidebar"""
@@ -69,25 +79,34 @@ def show_login_status():
             if st.session_state.get("logout"):
                 # del st.session_state["token"]
                 logout()
-                st.markdown('<meta http-equiv="refresh" content="0;URL=/alcopt">', unsafe_allow_html=True)
+                st.markdown(
+                    '<meta http-equiv="refresh" content="0;URL=/alcopt">',
+                    unsafe_allow_html=True,
+                )
 
     return token
+
 
 def get_user_token(button_key="login"):
     """Handles OAuth2 login and returns the token."""
     if "token" not in st.session_state:
-        result = oauth2.authorize_button("Login with Google", GOOGLE_REDIRECT_URI, GOOGLE_SCOPE, key=button_key)
+        result = oauth2.authorize_button(
+            "Login with Google", GOOGLE_REDIRECT_URI, GOOGLE_SCOPE, key=button_key
+        )
         if result and "token" in result:
             st.session_state.token = result["token"]
             user_info = get_user_info(st.session_state["token"]["access_token"])
             if user_info:
                 st.session_state.user_email = user_info.get("email", "Unknown User")
                 st.session_state.user_id = user_info.get("id", 0)
-                st.session_state.profile_pic = user_info.get("picture", "https://via.placeholder.com/50")
+                st.session_state.profile_pic = user_info.get(
+                    "picture", "https://via.placeholder.com/50"
+                )
             else:
                 st.session_state.profile_pic = "https://via.placeholder.com/50"
             st.rerun()
     return st.session_state.get("token")
+
 
 def refresh_access_token():
     if "token" not in st.session_state:
@@ -100,11 +119,15 @@ def refresh_access_token():
     st.session_state["token"] = token
     return True
 
+
 def get_user_info(token):
     """Fetch user info from Google OAuth2."""
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers)
+    response = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo", headers=headers
+    )
     return response.json() if response.status_code == 200 else None
+
 
 def is_admin():
     """Checks if current user is admin"""
