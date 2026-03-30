@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alcopt"
-version = "0.1.0"
+version = "0.2.0"
 description = "Alcohol recording and optimization"
 authors = [
     { name = "Thomas Hayama", email = "thomashayama@gmail.com" }

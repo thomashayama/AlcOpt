@@ -1,19 +1,13 @@
 from contextlib import contextmanager
-import toml
-import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
 from alcopt.database.models import Base, MassMeasurement
+from alcopt.config import DATABASE_URL
 
-# Load secrets from the TOML file specified in the SECRETS_FILE environment variable
-secrets_file = os.getenv("SECRETS_FILE", "secrets.toml")
-secrets = toml.load(secrets_file)
-
-
-DATABASE_URI = os.getenv("DATABASE_URL") or secrets["connections"]["alcopt_db"]["uri"]
+DATABASE_URI = DATABASE_URL
 
 connect_args = {}
 if DATABASE_URI.startswith("sqlite"):

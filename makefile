@@ -1,7 +1,7 @@
 # Variables
 PYTHON = python
 VENV_DIR = .venv
-SECRETS_FILE = secrets.toml
+ENV_FILE = .env
 APP_FILE = alcopt/app/Home.py
 DOCKER_COMPOSE = docker compose
 PORT = 8501
@@ -27,13 +27,11 @@ install:
 	@echo "Installing dependencies..."
 	$(ACTIVATE) && pip install -r requirements.txt 
 
-# Load secrets from secrets.toml and run Streamlit
+# Load env vars and run Streamlit
 .PHONY: local
 local:
-	@echo "Loading secrets from $(SECRETS_FILE)..."
-	@$(foreach line,$(shell cat $(SECRETS_FILE) | grep -v '^#' | sed 's/ = /=/g'), $(EXPORT_CMD) $(line);)
-	@echo "Starting Streamlit locally with OAuth..."
-	$(ACTIVATE) && streamlit run $(APP_FILE) --server.port $(PORT) --server.fileWatcherType none
+	@echo "Loading environment from $(ENV_FILE)..."
+	$(ACTIVATE) && set -a && . ./$(ENV_FILE) && set +a && streamlit run $(APP_FILE) --server.port $(PORT) --server.fileWatcherType none
 
 # Deploy with Docker Compose
 .PHONY: deploy

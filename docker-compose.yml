@@ -7,15 +7,14 @@ services:
       - 8912:8501
     volumes:
       - ./data:/data
-    environment:
-      - SECRETS_FILE=/app/secrets.toml
+    env_file: .env
     command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=none"]
     restart: unless-stopped
     networks:
       - thomashayama-net
 
   app-dev:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     ports:
@@ -23,8 +22,7 @@ services:
     volumes:
       - .:/app
       - ./data:/data
-    environment:
-      - SECRETS_FILE=/app/secrets.dev.toml
+    env_file: .env
     # command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=watchdog"]
     command: ["sleep", "infinity"]
     restart: unless-stopped

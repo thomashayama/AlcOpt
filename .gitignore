@@ -2,6 +2,7 @@
 **alcopt.egg-info
 
 **.db
+.env
 secrets.toml
 secrets-dev.toml
 secrets.dev.toml

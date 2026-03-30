@@ -65,10 +65,11 @@ python -m pip install -r requirements.txt
 
 ## Configuration
 
-Copy `secrets-example.toml` to `.streamlit/secrets.toml` and fill in:
-- Database connection URI
-- Google OAuth2 client credentials
-- Admin email list
+Copy `.env.example` to `.env` and fill in:
+- `DATABASE_URL` — database connection URI
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth2 credentials
+- `GOOGLE_REDIRECT_URI` — OAuth redirect URL
+- `ADMIN_EMAILS` — comma-separated list of admin emails
 
 ## Deployment (Railway)
 
@@ -77,13 +78,12 @@ This repo is designed to be used as a **git submodule** in a deploy monorepo. On
 1. Add this repo as a submodule in your deploy repo
 2. Create a service in your Railway project and set the **Root Directory** to the submodule path
 3. Add a **Postgres** service — Railway provides `DATABASE_URL` automatically
-4. Set environment variables:
+4. Set environment variables (or use Railway's env var UI):
    - `DATABASE_URL` — provided by Railway Postgres (auto-linked)
-   - `SECRETS_FILE` — path to your secrets TOML
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth credentials
+   - `GOOGLE_REDIRECT_URI` — OAuth redirect URL
+   - `ADMIN_EMAILS` — comma-separated admin emails
    - `PORT` — set automatically by Railway
-5. Configure Google OAuth credentials in your secrets file
-
-The app reads `DATABASE_URL` first, falling back to the URI in the secrets file. The Dockerfile exposes the app on `$PORT`.
 
 ## Database
 

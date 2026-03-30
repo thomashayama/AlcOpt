@@ -2,25 +2,19 @@ import requests
 import streamlit as st
 from streamlit_oauth import OAuth2Component
 from datetime import datetime, timedelta
-import toml
-import os
 
-# OAuth2 Configuration
-# Load secrets from the TOML file specified in the SECRETS_FILE environment variable
-secrets_file = os.getenv("SECRETS_FILE", "secrets.toml")
-secrets = toml.load(secrets_file)
-
-AUTHORIZE_URL = secrets["oauth"]["google"]["AUTHORIZE_URL"]
-TOKEN_URL = secrets["oauth"]["google"]["TOKEN_URL"]
-REFRESH_TOKEN_URL = secrets["oauth"]["google"]["REFRESH_TOKEN_URL"]
-REVOKE_TOKEN_URL = secrets["oauth"]["google"]["REVOKE_TOKEN_URL"]
-CLIENT_ID = secrets["oauth"]["google"]["CLIENT_ID"]
-CLIENT_SECRET = secrets["oauth"]["google"]["CLIENT_SECRET"]
-REDIRECT_URI = secrets["oauth"]["google"]["REDIRECT_URI"]
-SCOPE = secrets["oauth"]["google"]["SCOPE"]
+from alcopt.config import (
+    GOOGLE_AUTHORIZE_URL, GOOGLE_TOKEN_URL, GOOGLE_REFRESH_TOKEN_URL,
+    GOOGLE_REVOKE_TOKEN_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI, GOOGLE_SCOPE, ADMIN_EMAILS,
+)
 
 # Initialize OAuth2
-oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, REFRESH_TOKEN_URL, REVOKE_TOKEN_URL)
+oauth2 = OAuth2Component(
+    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+    GOOGLE_AUTHORIZE_URL, GOOGLE_TOKEN_URL,
+    GOOGLE_REFRESH_TOKEN_URL, GOOGLE_REVOKE_TOKEN_URL,
+)
 
 def logout():
     """Clear user session and refresh."""
@@ -82,7 +76,7 @@ def show_login_status():
 def get_user_token(button_key="login"):
     """Handles OAuth2 login and returns the token."""
     if "token" not in st.session_state:
-        result = oauth2.authorize_button("Login with Google", REDIRECT_URI, SCOPE, key=button_key)
+        result = oauth2.authorize_button("Login with Google", GOOGLE_REDIRECT_URI, GOOGLE_SCOPE, key=button_key)
         if result and "token" in result:
             st.session_state.token = result["token"]
             user_info = get_user_info(st.session_state["token"]["access_token"])
@@ -120,4 +114,4 @@ def logout():
 
 def is_admin():
     """Checks if current user is admin"""
-    return st.session_state.user_email in secrets["security"]["admin"]
+    return st.session_state.user_email in ADMIN_EMAILS
