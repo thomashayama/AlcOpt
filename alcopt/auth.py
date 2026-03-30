@@ -63,26 +63,17 @@ def show_login_status():
         token = get_user_token()
 
         if token:
-            st.markdown(
-                f"""
-                <div style="display: flex; align-items: center;">
-                    <img src="{st.session_state.profile_pic}" class="profile-img">
-                    <form action="" method="post">
-                        <input type="submit" value="Logout" name="logout" class="logout-button">
-                    </form>
-                </div>
-                </div> <!-- End of header-container -->
-                """,
-                unsafe_allow_html=True,
-            )
-
-            if st.session_state.get("logout"):
-                # del st.session_state["token"]
-                logout()
-                st.markdown(
-                    '<meta http-equiv="refresh" content="0;URL=/alcopt">',
-                    unsafe_allow_html=True,
+            col_pic, col_logout = st.columns([1, 2])
+            with col_pic:
+                st.image(
+                    st.session_state.get(
+                        "profile_pic", "https://via.placeholder.com/50"
+                    ),
+                    width=40,
                 )
+            with col_logout:
+                if st.button("Logout", key="sidebar_logout"):
+                    logout()
 
     return token
 
@@ -122,11 +113,16 @@ def refresh_access_token():
 
 def get_user_info(token):
     """Fetch user info from Google OAuth2."""
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(
-        "https://www.googleapis.com/oauth2/v2/userinfo", headers=headers
-    )
-    return response.json() if response.status_code == 200 else None
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers=headers,
+            timeout=10,
+        )
+        return response.json() if response.status_code == 200 else None
+    except (requests.RequestException, ValueError):
+        return None
 
 
 def is_admin():

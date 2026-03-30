@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import desc
 from alcopt.database.models import Bottle, Review
 from alcopt.database.utils import get_db
-from alcopt.auth import get_user_token, show_login_status, is_admin
+from alcopt.auth import show_login_status, is_admin
 from alcopt.utils import (
     reviews_to_df,
     plot_correlation_heatmap,
@@ -21,20 +21,11 @@ st.set_page_config(
 # Show login/logout button
 token = show_login_status()
 
-# if not token:
-#     st.warning("🔒 Please log in to access this page.")
-#     st.stop()
-email = None
-if "user_email" in st.session_state:
-    email = st.session_state.user_email
-else:
-    col1, col2 = st.columns([2, 2])
-    with col1:
-        token = get_user_token(button_key="page_login")
-    if token:
-        st.rerun()
-    with col2:
-        st.info("Recommended to logging in")
+if not token:
+    st.warning("🔒 Please log in to access this page.")
+    st.stop()
+
+email = st.session_state.get("user_email")
 with st.form("Tasting Form"):
     # Inject CSS for larger slider
     st.markdown(
