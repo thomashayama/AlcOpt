@@ -2,6 +2,9 @@ import os
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/alcopt.db")
+# Railway provides postgres:// but SQLAlchemy requires postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Google OAuth - constant URLs
 GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/auth"
