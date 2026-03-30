@@ -46,8 +46,7 @@ docker compose up -d app
 docker compose up -d app-dev
 
 # Local
-make local
-# or: streamlit run alcopt/app/Home.py
+uv run streamlit run alcopt/app/Home.py
 ```
 
 ## Configuration
@@ -89,5 +88,13 @@ ruff format alcopt/
 Run `ruff check` and `ruff format` before committing. Both should pass with zero issues.
 
 ## Dependencies
+
+Managed with [uv](https://docs.astral.sh/uv/). Dependencies defined in `pyproject.toml`, locked in `uv.lock`.
+
+```bash
+uv add <package>        # add a dependency
+uv remove <package>     # remove a dependency
+uv sync                 # install from lockfile
+```
 
 Core: streamlit, streamlit-oauth, sqlalchemy, pandas, numpy, matplotlib, seaborn, unum, opencv-python, psycopg2-binary

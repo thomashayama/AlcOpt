@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "alcopt"
 version = "0.2.0"
@@ -9,6 +5,24 @@ description = "Alcohol recording and optimization"
 authors = [
     { name = "Thomas Hayama", email = "thomashayama@gmail.com" }
 ]
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit",
+    "streamlit-oauth",
+    "pandas",
+    "numpy",
+    "mpld3",
+    "matplotlib",
+    "sqlalchemy",
+    "opencv-python",
+    "unum",
+    "seaborn",
+    "psycopg2-binary",
+]
 
-[tool.setuptools]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
 packages = ["alcopt"]
