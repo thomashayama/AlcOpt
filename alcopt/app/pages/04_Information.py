@@ -8,15 +8,19 @@ from unum import units
 
 
 from alcopt.database.models import (
-    Vessel,
+    Container,
+    ContainerFermentationLog,
     Fermentation,
-    FermentationIngredient,
+    IngredientAddition,
     SpecificGravityMeasurement,
-    Bottle,
     Review,
 )
 from alcopt.utils import sg_diff_to_abv, abv_to_sugar, get_sugar, BENCHMARK, mL
-from alcopt.database.utils import get_db
+from alcopt.database.utils import (
+    get_db,
+    current_fermentation_log,
+    latest_fermentation_log,
+)
 from alcopt.auth import show_login_status
 
 st.set_page_config(
@@ -36,9 +40,16 @@ def display_fermentation_info(db, fermentation):
     st.write(f"**End Date:** {fermentation.end_date}")
 
     st.subheader("Ingredients")
-    ingredients = (
-        db.query(FermentationIngredient)
+    # Get all ingredient additions for containers that were part of this fermentation
+    logs = (
+        db.query(ContainerFermentationLog)
         .filter_by(fermentation_id=fermentation.id)
+        .all()
+    )
+    container_ids = {log.container_id for log in logs}
+    ingredients = (
+        db.query(IngredientAddition)
+        .filter(IngredientAddition.container_id.in_(container_ids))
         .all()
     )
     if ingredients:
@@ -48,7 +59,7 @@ def display_fermentation_info(db, fermentation):
                     ing.ingredient.name,
                     ing.amount,
                     ing.unit,
-                    (ing.added_at - fermentation.start_date).days,
+                    (ing.added_at.date() - fermentation.start_date).days,
                     ing.ingredient.price,
                 )
                 for ing in ingredients
@@ -64,8 +75,8 @@ def display_fermentation_info(db, fermentation):
     else:
         st.write("No ingredients added yet.")
 
-    # Calculate yield TODO
-    # bottle_log = db.query(BottleLog).filter_by(fermentation_id=fermentation.id).all()
+    # Calculate yield from bottle logs
+    bottle_logs = [log for log in logs if log.stage == "bottled"]
     initial_volume = np.sum(
         [
             ing.amount
@@ -73,18 +84,18 @@ def display_fermentation_info(db, fermentation):
             if ing.ingredient.ingredient_type == "Liquid"
         ]
     )
-    # final_volume = fermentation.final_volume_liters  # Assuming this field exists
     final_mass = np.sum(
         [
-            b.amount - b.bottle.empty_mass
-            for b in fermentation.bottle_logs
-            if b.unit == "g"
+            b.amount
+            - db.query(Container).filter_by(id=b.container_id).first().empty_mass
+            for b in bottle_logs
+            if b.unit == "g" and b.amount is not None
         ]
-    )  # Assumes in g
+    )
     st.markdown(f"**Initial Volume (mL):** {initial_volume:.2f}")
     st.markdown(f"**Final Mass (g):** {final_mass:.2f}")
 
-    # Calculate cost TODO
+    # Calculate cost
     total_cost = 0.0
     for ing in ingredients:
         m = 1.0
@@ -102,9 +113,7 @@ def display_fermentation_info(db, fermentation):
                 m = 0.00492892
         else:
             warnings.warn(f"Unknown ingredient type: {ing.ingredient.ingredient_type}")
-        total_cost += (
-            ing.ingredient.price * ing.amount * m
-        )  # TODO Fix how units are handled
+        total_cost += ing.ingredient.price * ing.amount * m
     st.markdown(f"**Total Cost:** ${total_cost:.2f}")
     if final_mass > 0:
         st.markdown(f"**Cost per kg:** ${1000 * total_cost / final_mass:.2f}")
@@ -144,7 +153,6 @@ def display_fermentation_info(db, fermentation):
         ax1.set_xlabel("Days from Start")
         ax1.set_ylabel("Specific Gravity", color="tab:blue")
 
-        # Plot initial and final SG as horizontal lines with labels
         ax1.axhline(y=initial_sg, color="gray", linestyle="--")
         ax1.text(
             0,
@@ -201,66 +209,42 @@ def display_fermentation_info(db, fermentation):
         st.write("No specific gravity measurements yet.")
 
 
-def get_vessel_info(vessel_id):
+def get_container_info(container_id):
     with get_db() as db:
         try:
-            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
+            container = db.query(Container).filter_by(id=container_id).first()
 
-            if not vessel:
-                st.error(f"No vessel found with ID: {vessel_id}")
+            if not container:
+                st.error(f"No container found with ID: {container_id}")
                 return
 
-            fermentation = (
-                db.query(Fermentation).filter_by(id=vessel.fermentation_id).first()
-                if vessel.fermentation_id
-                else None
+            st.title(
+                f"Container Information for {container.container_type.title()} ID: {container_id}"
             )
 
-            st.title(f"Vessel Information for Vessel ID: {vessel_id}")
+            st.subheader("Container Details")
+            st.write(f"**Type:** {container.container_type}")
+            st.write(f"**Volume (liters):** {container.volume_liters}")
+            st.write(f"**Material:** {container.material}")
+            st.write(f"**Empty Mass:** {container.empty_mass}")
+            st.write(f"**Date Added:** {container.date_added}")
 
-            if fermentation:
-                display_fermentation_info(db, fermentation)
+            # Resolve fermentation from log
+            log = current_fermentation_log(db, container_id)
+            if log is None:
+                log = latest_fermentation_log(db, container_id)
+
+            if log:
+                fermentation = (
+                    db.query(Fermentation).filter_by(id=log.fermentation_id).first()
+                )
+                if fermentation:
+                    display_fermentation_info(db, fermentation)
             else:
-                st.write("This vessel is not currently used in any fermentation.")
-
-            st.subheader("Vessel Details")
-            st.write(f"**Volume (liters):** {vessel.volume_liters}")
-            st.write(f"**Material:** {vessel.material}")
-            st.write(f"**Empty Mass:** {vessel.empty_mass}")
-            st.write(f"**Date Added:** {vessel.date_added}")
-        except Exception as e:
-            traceback.print_exc()
-            st.error(f"An error occurred: {e}")
-
-
-def get_bottle_info(bottle_id):
-    with get_db() as db:
-        try:
-            bottle = db.query(Bottle).filter_by(id=bottle_id).first()
-
-            if not bottle:
-                st.error(f"No bottle found with ID: {bottle_id}")
-                return
-
-            fermentation = (
-                db.query(Fermentation).filter_by(id=bottle.fermentation_id).first()
-                if bottle.fermentation_id
-                else None
-            )
-
-            st.title(f"Bottle Information for Bottle ID: {bottle_id}")
-
-            st.subheader("Bottle Details")
-            st.write(f"**Volume (liters):** {bottle.volume_liters}")
-            st.write(f"**Empty Mass:** {bottle.empty_mass}")
-            st.write(f"**Date Added:** {bottle.date_added}")
-            st.write(f"**Bottling Date:** {bottle.bottling_date}")
-
-            if fermentation:
-                display_fermentation_info(db, fermentation)
+                st.write("This container has no fermentation history.")
 
             st.subheader("Reviews")
-            reviews = db.query(Review).filter_by(bottle_id=bottle_id).all()
+            reviews = db.query(Review).filter_by(container_id=container_id).all()
             if reviews:
                 reviews_df = pd.DataFrame(
                     [
@@ -287,28 +271,21 @@ def get_bottle_info(bottle_id):
                 )
                 st.dataframe(reviews_df, hide_index=True)
             else:
-                st.write("No reviews for this bottle yet.")
+                st.write("No reviews for this container yet.")
         except Exception as e:
             traceback.print_exc()
             st.error(f"An error occurred: {e}")
 
 
-def vessel_info_form():
-    st.title("Retrieve Vessel or Bottle Information")
+def container_info_form():
+    st.title("Retrieve Container Information")
 
-    with st.form(key="vessel_info_form"):
-        retrieval_type = st.radio(
-            "Select the type of information to retrieve:", ("Vessel", "Bottle")
-        )
-        id_input = st.number_input("ID", min_value=1, step=1)
-
+    with st.form(key="container_info_form"):
+        id_input = st.number_input("Container ID", min_value=1, step=1)
         submit_button = st.form_submit_button(label="Get Information")
 
     if submit_button:
-        if retrieval_type == "Vessel":
-            get_vessel_info(id_input)
-        else:
-            get_bottle_info(id_input)
+        get_container_info(id_input)
 
 
-vessel_info_form()
+container_info_form()
