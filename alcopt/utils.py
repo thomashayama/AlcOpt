@@ -8,9 +8,8 @@ import pandas as pd
 from alcopt.database.models import (
     Fermentation,
     Review,
-    Bottle,
     SpecificGravityMeasurement,
-    FermentationIngredient,
+    IngredientAddition,
 )
 from alcopt.database.utils import get_db
 
@@ -120,7 +119,7 @@ def get_sugar(ingredients):
             amount = ingredient["amount"]
             sugar_content = ingredient["sugar_content"]
             density = ingredient["density"]
-        elif isinstance(ingredient, FermentationIngredient):
+        elif isinstance(ingredient, IngredientAddition):
             ingredient_type = ingredient.ingredient.ingredient_type.lower()
             amount = ingredient.amount * str2unit[ingredient.unit]
             sugar_content = ingredient.ingredient.sugar_content * (
@@ -176,14 +175,14 @@ def reviews_to_df(reviews: list) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: A DataFrame containing the review data with columns:
-                      'Name', 'Bottle ID', 'Overall Rating', 'Boldness',
+                      'Name', 'Container ID', 'Overall Rating', 'Boldness',
                       'Tannicity', 'Sweetness', 'Acidity', 'Complexity', and 'Review Date'.
     """
     # Convert to a list of dictionaries
     reviews_list = [
         {
             "Name": review.name,
-            "Bottle ID": review.bottle_id,
+            "Container ID": review.container_id,
             "Overall Rating": review.overall_rating,
             "Boldness": review.boldness,
             "Tannicity": review.tannicity,
@@ -262,14 +261,12 @@ def get_ratings_abv_data():
         data = (
             db.query(
                 Review.overall_rating,
-                SpecificGravityMeasurement.fermentation_id,
                 func.max(SpecificGravityMeasurement.specific_gravity).label(
                     "initial_sg"
                 ),
                 func.min(SpecificGravityMeasurement.specific_gravity).label("final_sg"),
             )
-            .join(Bottle, Review.bottle_id == Bottle.id)
-            .join(Fermentation, Bottle.fermentation_id == Fermentation.id)
+            .join(Fermentation, Review.fermentation_id == Fermentation.id)
             .join(
                 SpecificGravityMeasurement,
                 Fermentation.id == SpecificGravityMeasurement.fermentation_id,
@@ -280,9 +277,7 @@ def get_ratings_abv_data():
 
         ratings_abv = []
         for row in data:
-            initial_sg = row.initial_sg
-            final_sg = row.final_sg
-            abv = (initial_sg - final_sg) * 131.25
+            abv = (row.initial_sg - row.final_sg) * 131.25
             ratings_abv.append((row.overall_rating, abv))
 
         return ratings_abv
@@ -293,11 +288,9 @@ def get_ratings_rs_data():
         data = (
             db.query(
                 Review.overall_rating,
-                SpecificGravityMeasurement.fermentation_id,
                 func.min(SpecificGravityMeasurement.specific_gravity).label("final_sg"),
             )
-            .join(Bottle, Review.bottle_id == Bottle.id)
-            .join(Fermentation, Bottle.fermentation_id == Fermentation.id)
+            .join(Fermentation, Review.fermentation_id == Fermentation.id)
             .join(
                 SpecificGravityMeasurement,
                 Fermentation.id == SpecificGravityMeasurement.fermentation_id,

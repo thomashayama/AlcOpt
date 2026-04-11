@@ -22,31 +22,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from alcopt.database.models import (
     Base,
-    Vessel,
-    Ingredient,
+    Container,
+    ContainerFermentationLog,
     Fermentation,
-    FermentationVesselLog,
-    FermentationIngredient,
-    SpecificGravityMeasurement,
+    Ingredient,
+    IngredientAddition,
     MassMeasurement,
-    Bottle,
-    BottleIngredient,
-    BottleLog,
     Review,
+    SpecificGravityMeasurement,
 )
 
 # Order matters: parents before children (foreign key dependencies)
 TABLES_IN_ORDER = [
     Ingredient,
     Fermentation,
-    Vessel,
-    FermentationVesselLog,
-    FermentationIngredient,
+    Container,
+    ContainerFermentationLog,
+    IngredientAddition,
     SpecificGravityMeasurement,
     MassMeasurement,
-    Bottle,
-    BottleIngredient,
-    BottleLog,
     Review,
 ]
 

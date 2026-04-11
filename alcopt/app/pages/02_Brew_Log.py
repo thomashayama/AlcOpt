@@ -5,27 +5,29 @@ from unum import units
 import logging
 import traceback
 
-# SQL
 from sqlalchemy import asc
 
 from alcopt.database.models import (
+    Container,
+    ContainerFermentationLog,
     Fermentation,
-    SpecificGravityMeasurement,
-    FermentationIngredient,
     Ingredient,
-    Vessel,
-    FermentationVesselLog,
-    Bottle,
-    BottleLog,
+    IngredientAddition,
     MassMeasurement,
+    SpecificGravityMeasurement,
 )
 from alcopt.streamlit_utils import (
-    all_ferm_ingredients_info,
-    all_vessel_log_info,
+    all_container_log_info,
+    all_containers_info,
+    all_ingredient_additions_info,
     all_sg_measurement_info,
-    all_bottle_info,
 )
-from alcopt.database.utils import get_db, all_mass_measurement_info
+from alcopt.database.utils import (
+    all_mass_measurement_info,
+    close_open_log,
+    current_fermentation_log,
+    get_db,
+)
 from alcopt.utils import (
     abv_to_sugar,
     BENCHMARK,
@@ -40,7 +42,6 @@ st.set_page_config(
     page_icon="🍷",
 )
 
-# Show login/logout button
 token = show_login_status()
 
 if not token:
@@ -92,11 +93,62 @@ def add_new_ingredient(db):
                     logging.error(f"An error occurred: {e}")
 
 
-def add_fermentation_ingredient(ingredient_name=None):
-    """Add Ingredient to a fermentation"""
+def start_fermentation_form():
+    """Explicitly create a new fermentation in a container.
+
+    Replaces the implicit fermentation-creation that used to happen on first
+    ingredient add. Opens a new ContainerFermentationLog row, closing any
+    previously-open one on that container.
+    """
+    with st.form("start_fermentation_form"):
+        container_id = st.number_input(
+            "Container ID", value=1, min_value=1, step=1, key="start_ferm_container_id"
+        )
+        date = st.date_input("Start Date", key="start_ferm_date")
+        stage = st.text_input("Stage", value="primary", key="start_ferm_stage")
+        if st.form_submit_button("Start Fermentation"):
+            with get_db() as db:
+                try:
+                    container = db.query(Container).filter_by(id=container_id).first()
+                    if container is None:
+                        st.error(f"Container {container_id} not found")
+                        return
+                    start_dt = datetime.combine(date, datetime.min.time())
+                    new_ferm = Fermentation(start_date=date)
+                    db.add(new_ferm)
+                    db.flush()
+                    close_open_log(db, container_id, start_dt)
+                    db.add(
+                        ContainerFermentationLog(
+                            container_id=container_id,
+                            fermentation_id=new_ferm.id,
+                            start_date=start_dt,
+                            stage=stage,
+                        )
+                    )
+                    db.commit()
+                    st.success(
+                        f"Started Fermentation {new_ferm.id} in Container {container_id}"
+                    )
+                    logging.info(
+                        f"{st.session_state.get('user_email', 'unknown')} started fermentation {new_ferm.id} in container {container_id}"
+                    )
+                except Exception as e:
+                    db.rollback()
+                    st.error(f"Error: {e}")
+                    logging.error(f"An error occurred: {e}")
+
+
+def add_ingredient_addition_form(ingredient_name=None):
+    """Add an ingredient to a container at a specific time.
+
+    The container does NOT need to currently hold a fermentation. This is the
+    core flexibility ask: pre-fermentation soak, post-bottling priming sugar,
+    aging additions, etc. all flow through this single form.
+    """
     with st.form("Add Ingredient"):
         with get_db() as db:
-            vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+            container_id = st.number_input("Container ID", value=1, min_value=1, step=1)
             if ingredient_name is None:
                 ingredient_name = st.text_input("Ingredient Name")
             date = st.date_input("Date")
@@ -109,58 +161,40 @@ def add_fermentation_ingredient(ingredient_name=None):
             unit = st.text_input("Units", "g")
             if st.form_submit_button("Add"):
                 try:
-                    vessel = db.query(Vessel).filter_by(id=vessel_id).first()
-                    if vessel is None:
-                        st.error(f"Vessel {vessel_id} not found")
-                    else:
-                        fermentation_id = vessel.fermentation_id
-                        if fermentation_id is None:
-                            new_fermentation = Fermentation(start_date=date)
-                            db.add(new_fermentation)
-                            db.commit()
-                            fermentation_id = new_fermentation.id
-                            st.success(f"Created New Fermentation <{fermentation_id}>")
-
-                            vessel_log = FermentationVesselLog(
-                                fermentation_id=fermentation_id,
-                                vessel_id=vessel_id,
-                                start_date=date,
-                            )
-                            db.add(vessel_log)
-                            db.commit()
-                            st.success(
-                                f"Created New Fermentation Vessel Log <{vessel_log.id}>"
-                            )
-
-                            # Update the fermentation_id of the vessel
-                            vessel.fermentation_id = fermentation_id
-                            db.commit()
-                            st.success(
-                                f"Fermentation ID updated successfully for Vessel ID: {vessel_id}"
-                            )
-                        ingredient = (
-                            db.query(Ingredient).filter_by(name=ingredient_name).first()
-                        )
-                        if ingredient is None:
-                            st.error(f"Ingredient '{ingredient_name}' not found")
-                            return
-                        ingredient_id = ingredient.id
-                        new_ferm_ingredient = FermentationIngredient(
-                            fermentation_id=fermentation_id,
-                            ingredient_id=ingredient_id,
-                            amount=amount,
-                            unit=unit,
-                            added_at=date,
-                        )
-                        db.add(new_ferm_ingredient)
-                        db.commit()
+                    container = db.query(Container).filter_by(id=container_id).first()
+                    if container is None:
+                        st.error(f"Container {container_id} not found")
+                        return
+                    ingredient = (
+                        db.query(Ingredient).filter_by(name=ingredient_name).first()
+                    )
+                    if ingredient is None:
+                        st.error(f"Ingredient '{ingredient_name}' not found")
+                        return
+                    added_at = datetime.combine(date, datetime.now().time())
+                    addition = IngredientAddition(
+                        container_id=container_id,
+                        ingredient_id=ingredient.id,
+                        amount=amount,
+                        unit=unit,
+                        added_at=added_at,
+                    )
+                    db.add(addition)
+                    db.commit()
+                    active = current_fermentation_log(db, container_id, added_at)
+                    if active is not None:
                         st.success(
-                            f"Created New Fermentation Ingredient <{new_ferm_ingredient.id}>"
+                            f"Added to Container {container_id} (fermentation {active.fermentation_id})"
                         )
-                        logging.info(
-                            f"{st.session_state.get('user_email', 'unknown')} added ingredient: {ingredient_name} to vessel: {vessel_id}"
+                    else:
+                        st.success(
+                            f"Added to Container {container_id} (no active fermentation)"
                         )
+                    logging.info(
+                        f"{st.session_state.get('user_email', 'unknown')} added ingredient: {ingredient_name} to container: {container_id}"
+                    )
                 except Exception as e:
+                    db.rollback()
                     st.error(f"Error {e}")
                     logging.error(f"An error occurred: {e}")
 
@@ -169,7 +203,9 @@ def add_sg_measurement_form(db):
     st.title("Add Specific Gravity Measurement")
 
     with st.form(key="measurement_form"):
-        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+        container_id = st.number_input(
+            "Container ID", value=1, min_value=1, step=1, key="sg_container_id"
+        )
         measurement_date = st.date_input("Measurement Date", value=datetime.now())
         specific_gravity = st.number_input(
             "Specific Gravity", value=0.999, min_value=0.0, step=0.001, format="%.3f"
@@ -179,38 +215,41 @@ def add_sg_measurement_form(db):
 
     if submit_button:
         try:
-            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
-            if vessel is None:
-                st.error(f"Vessel {vessel_id} not found")
-            else:
-                if vessel.fermentation_id is None:
-                    st.error(f"Vessel {vessel_id} doesn't have a fermentation")
-                else:
-                    # Add new specific gravity measurement
-                    new_measurement = SpecificGravityMeasurement(
-                        fermentation_id=vessel.fermentation_id,
-                        measurement_date=measurement_date,
-                        specific_gravity=specific_gravity,
-                    )
-                    db.add(new_measurement)
-                    db.commit()
-                    st.success(
-                        f"Measurement added successfully for Fermentation ID: {vessel.fermentation_id}"
-                    )
-                    logging.info(
-                        f"{st.session_state.get('user_email', 'unknown')} added measurement to vessel: {vessel_id}"
-                    )
+            container = db.query(Container).filter_by(id=container_id).first()
+            if container is None:
+                st.error(f"Container {container_id} not found")
+                return
+            measured_at = datetime.combine(measurement_date, datetime.now().time())
+            log = current_fermentation_log(db, container_id, measured_at)
+            if log is None:
+                st.error(
+                    f"Container {container_id} has no active fermentation at {measurement_date}"
+                )
+                return
+            new_measurement = SpecificGravityMeasurement(
+                fermentation_id=log.fermentation_id,
+                measurement_date=measurement_date,
+                specific_gravity=specific_gravity,
+            )
+            db.add(new_measurement)
+            db.commit()
+            st.success(f"Measurement added for Fermentation {log.fermentation_id}")
+            logging.info(
+                f"{st.session_state.get('user_email', 'unknown')} added SG measurement to container: {container_id}"
+            )
         except Exception as e:
+            db.rollback()
             st.error(f"An error occurred: {e}")
             logging.error(f"An error occurred: {e}")
-            db.rollback()
 
 
 def add_mass_measurement_form(db):
     st.title("Add Mass Measurement")
 
     with st.form(key="mass_measurement_form"):
-        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
+        container_id = st.number_input(
+            "Container ID", value=1, min_value=1, step=1, key="mass_container_id"
+        )
         measurement_date = st.date_input("Measurement Date", value=datetime.now())
         mass = st.number_input(
             "Mass (g)", value=0.0, min_value=0.0, step=0.1, format="%.1f"
@@ -220,147 +259,195 @@ def add_mass_measurement_form(db):
 
     if submit_button:
         try:
-            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
-            if vessel is None:
-                st.error(f"Vessel {vessel_id} not found")
-            else:
-                if vessel.fermentation_id is None:
-                    st.error(f"Vessel {vessel_id} doesn't have a fermentation")
-                else:
-                    # Add new mass measurement
-                    new_mass_measurement = MassMeasurement(
-                        fermentation_id=vessel.fermentation_id,
-                        measurement_date=measurement_date,
-                        mass=mass,
-                    )
-                    db.add(new_mass_measurement)
-                    db.commit()
-                    st.success(
-                        f"Mass measurement added successfully for Fermentation ID: {vessel.fermentation_id}"
-                    )
-                    logging.info(
-                        f"{st.session_state.get('user_email', 'unknown')} added mass measurement to vessel: {vessel_id}"
-                    )
+            container = db.query(Container).filter_by(id=container_id).first()
+            if container is None:
+                st.error(f"Container {container_id} not found")
+                return
+            measured_at = datetime.combine(measurement_date, datetime.now().time())
+            log = current_fermentation_log(db, container_id, measured_at)
+            if log is None:
+                st.error(
+                    f"Container {container_id} has no active fermentation at {measurement_date}"
+                )
+                return
+            new_mass_measurement = MassMeasurement(
+                fermentation_id=log.fermentation_id,
+                measurement_date=measurement_date,
+                mass=mass,
+            )
+            db.add(new_mass_measurement)
+            db.commit()
+            st.success(f"Mass measurement added for Fermentation {log.fermentation_id}")
+            logging.info(
+                f"{st.session_state.get('user_email', 'unknown')} added mass measurement to container: {container_id}"
+            )
         except Exception as e:
+            db.rollback()
             st.error(f"An error occurred: {e}")
             logging.error(f"An error occurred: {e}")
-            db.rollback()
 
 
 def rack_form(db):
+    """Move a fermentation from one container to another.
+
+    Closes the source container's open log, opens a new log on the destination
+    with the same fermentation_id and `source_container_id` set for traceability.
+    """
     with st.form(key="rack_form"):
         col_from, col_to = st.columns((1, 1))
-        from_vessel_id = col_from.number_input(
-            "From Vessel ID", value=1, min_value=1, step=1
+        from_container_id = col_from.number_input(
+            "From Container ID", value=1, min_value=1, step=1
         )
-        to_vessel_id = col_to.number_input("To Vessel ID", value=1, min_value=1, step=1)
-        date = st.date_input("Date")
+        to_container_id = col_to.number_input(
+            "To Container ID", value=1, min_value=1, step=1
+        )
+        date = st.date_input("Date", key="rack_date")
+        stage = st.text_input("Stage", value="secondary", key="rack_stage")
         submit_button = st.form_submit_button(label="Add Action")
 
     if submit_button:
         try:
-            from_vessel = db.query(Vessel).filter_by(id=from_vessel_id).first()
-            to_vessel = db.query(Vessel).filter_by(id=to_vessel_id).first()
-            if not from_vessel:
-                st.error(f"Vessel {from_vessel_id} not found")
+            from_container = db.query(Container).filter_by(id=from_container_id).first()
+            to_container = db.query(Container).filter_by(id=to_container_id).first()
+            if not from_container:
+                st.error(f"Container {from_container_id} not found")
                 return
-            if not to_vessel:
-                st.error(f"Vessel {to_vessel_id} not found")
+            if not to_container:
+                st.error(f"Container {to_container_id} not found")
                 return
-            vessel_log = FermentationVesselLog(
-                fermentation_id=from_vessel.fermentation_id,
-                vessel_id=to_vessel.id,
-                start_date=date,
+            at = datetime.combine(date, datetime.now().time())
+            from_log = current_fermentation_log(db, from_container_id, at)
+            if from_log is None:
+                st.error(f"Container {from_container_id} has no active fermentation")
+                return
+            fermentation_id = from_log.fermentation_id
+            close_open_log(db, from_container_id, at)
+            close_open_log(db, to_container_id, at)
+            db.add(
+                ContainerFermentationLog(
+                    container_id=to_container_id,
+                    fermentation_id=fermentation_id,
+                    start_date=at,
+                    source_container_id=from_container_id,
+                    stage=stage,
+                )
             )
-            db.add(vessel_log)
             db.commit()
-            to_vessel.fermentation_id = from_vessel.fermentation_id
-            from_vessel.fermentation_id = None
-            db.commit()
-            st.success(f"Racked from {from_vessel.id} to {to_vessel.id}")
+            st.success(
+                f"Racked fermentation {fermentation_id} from {from_container_id} to {to_container_id}"
+            )
             logging.info(
-                f"{st.session_state.get('user_email', 'unknown')} racked from vessel: {from_vessel_id} to vessel: {to_vessel_id}"
+                f"{st.session_state.get('user_email', 'unknown')} racked from container: {from_container_id} to container: {to_container_id}"
             )
         except Exception as e:
+            db.rollback()
             st.error(f"An error occurred: {e}")
             logging.error(f"An error occurred: {e}")
 
 
 def bottle_form(db):
+    """Bottle (or otherwise transfer a portion) from one container to another.
+
+    Unlike rack, this does NOT close the source's log — the source vessel may
+    still hold liquid. Opens a new log on the destination container with
+    `stage='bottled'` and a recorded amount.
+    """
     with st.form(key="bottle_form"):
-        vessel_id = st.number_input("Vessel ID", value=1, min_value=1, step=1)
-        bottle_id = st.number_input("Bottle ID", value=1, min_value=1, step=1)
-        date = st.date_input("Date")
-        col_start, col_end = st.columns([1, 1])
-        amount = col_start.number_input("Total Amount", value=0.0, min_value=0.0)
-        unit = st.text_input("Units", "g")
+        from_container_id = st.number_input(
+            "From Container ID (vessel)",
+            value=1,
+            min_value=1,
+            step=1,
+            key="bottle_from",
+        )
+        to_container_id = st.number_input(
+            "To Container ID (bottle)", value=1, min_value=1, step=1, key="bottle_to"
+        )
+        date = st.date_input("Date", key="bottle_date")
+        amount = st.number_input("Amount", value=0.0, min_value=0.0)
+        unit = st.text_input("Units", "g", key="bottle_unit")
         submit_button = st.form_submit_button(label="Add Action")
 
     if submit_button:
         try:
-            vessel = db.query(Vessel).filter_by(id=vessel_id).first()
-            bottle = db.query(Bottle).filter_by(id=bottle_id).first()
-            if not vessel:
-                st.error(f"Vessel {vessel_id} not found")
+            from_container = db.query(Container).filter_by(id=from_container_id).first()
+            to_container = db.query(Container).filter_by(id=to_container_id).first()
+            if not from_container:
+                st.error(f"Container {from_container_id} not found")
                 return
-            if not bottle:
-                st.error(f"Bottle {bottle_id} not found")
+            if not to_container:
+                st.error(f"Container {to_container_id} not found")
                 return
-            bottle_log = BottleLog(
-                fermentation_id=vessel.fermentation_id,
-                bottle_id=bottle.id,
-                vessel_id=vessel_id,
-                bottling_date=date,
-                amount=amount,
-                unit=unit,
+            at = datetime.combine(date, datetime.now().time())
+            from_log = current_fermentation_log(db, from_container_id, at)
+            if from_log is None:
+                st.error(f"Container {from_container_id} has no active fermentation")
+                return
+            close_open_log(db, to_container_id, at)
+            db.add(
+                ContainerFermentationLog(
+                    container_id=to_container_id,
+                    fermentation_id=from_log.fermentation_id,
+                    start_date=at,
+                    source_container_id=from_container_id,
+                    amount=amount,
+                    unit=unit,
+                    stage="bottled",
+                )
             )
-            db.add(bottle_log)
             db.commit()
-            st.success(f"Created New Bottle Log <{bottle_log.id}>")
-
-            bottle.fermentation_id = vessel.fermentation_id
-            bottle.bottling_date = date
-            db.commit()
-            st.success(f"Bottled from Vessel {vessel.id} into Bottle {bottle.id}")
+            st.success(
+                f"Bottled fermentation {from_log.fermentation_id} from {from_container_id} into {to_container_id}"
+            )
             logging.info(
-                f"{st.session_state.get('user_email', 'unknown')} bottled from vessel: {vessel_id} to bottle: {bottle_id}"
+                f"{st.session_state.get('user_email', 'unknown')} bottled from container: {from_container_id} to container: {to_container_id}"
             )
         except Exception as e:
+            db.rollback()
             st.error(f"An error occurred: {e}")
             logging.error(f"An error occurred: {e}")
 
-    empty_vessel_id = st.number_input(
-        "Vessel ID to Empty", value=1, min_value=1, step=1, key="empty_vessel_id"
+    empty_container_id = st.number_input(
+        "Container ID to Empty",
+        value=1,
+        min_value=1,
+        step=1,
+        key="empty_container_id",
     )
-    if st.button("Vessel Empty"):
-        vessel = db.query(Vessel).filter_by(id=empty_vessel_id).first()
-        if not vessel:
-            st.error(f"Vessel {empty_vessel_id} not found")
+    if st.button("Empty Container"):
+        container = db.query(Container).filter_by(id=empty_container_id).first()
+        if not container:
+            st.error(f"Container {empty_container_id} not found")
             return
-        vessel.fermentation_id = None
+        closed = close_open_log(db, empty_container_id, datetime.now())
         db.commit()
-        st.success(f"Vessel {vessel.id} Emptied")
+        if closed is not None:
+            st.success(
+                f"Container {empty_container_id} emptied (closed log {closed.id})"
+            )
+        else:
+            st.info(f"Container {empty_container_id} had no open log")
 
 
 def display_ingredient_calculator():
     st.title("Fermentation Ingredient Calculator")
 
-    # Select vessel ID to load vessel information
-    vessel_id = st.number_input("Vessel ID", min_value=1, step=1)
+    container_id = st.number_input("Container ID", min_value=1, step=1)
 
     with get_db() as db:
-        vessel = db.query(Vessel).filter_by(id=vessel_id).first()
-        if not vessel:
-            st.error("No vessel found with the given ID.")
+        container = db.query(Container).filter_by(id=container_id).first()
+        if not container:
+            st.error("No container found with the given ID.")
             return
 
-        max_vessel_volume = vessel.volume_liters * units.L
+        max_container_volume = container.volume_liters * units.L
 
         ingredients = db.query(Ingredient).all()
 
-    st.write(f"Maximum Vessel Volume: {max_vessel_volume.asNumber(units.L):.2f} L")
+    st.write(
+        f"Maximum Container Volume: {max_container_volume.asNumber(units.L):.2f} L"
+    )
 
-    # Select ingredients
     ingredient_options = {ingredient.name: ingredient for ingredient in ingredients}
     selected_ingredient_names = st.multiselect(
         "Select Ingredients", list(ingredient_options.keys())
@@ -398,31 +485,26 @@ def display_ingredient_calculator():
             }
         )
 
-    # Calculate fermentation volume automatically from added ingredients
     if selected_ingredients:
         max_abv, max_sugar_content, fermentation_volume = calculate_max_potential_abv(
             selected_ingredients
         )
 
-        # Display current volume taken up by added ingredients
         st.write(
             f"Current Total Volume: {fermentation_volume.asNumber(units.L)} liters"
         )
 
-        # Check if the maximum volume is exceeded
-        if fermentation_volume > max_vessel_volume * 1000:
-            st.error("Error: Total volume exceeds the maximum vessel volume!")
-        elif fermentation_volume > 0.9 * max_vessel_volume * 1000:
+        if fermentation_volume > max_container_volume * 1000:
+            st.error("Error: Total volume exceeds the maximum container volume!")
+        elif fermentation_volume > 0.9 * max_container_volume * 1000:
             st.warning(
-                "Warning: Total volume is above 90% of the maximum vessel volume!"
+                "Warning: Total volume is above 90% of the maximum container volume!"
             )
 
-        # Handle case where max_abv and max_sugar_content are both 0
         if max_abv == 0:
             st.error("No valid ingredients added to calculate ABV and sugar content.")
             return
 
-        # Slider for the desired ABV
         desired_abv = st.slider(
             "Desired ABV (%)",
             min_value=0.0,
@@ -431,19 +513,16 @@ def display_ingredient_calculator():
             key="desired_abv",
         )
 
-        # Calculate and display the resulting sugar content based on the desired ABV
         resulting_sugar_content = max_sugar_content - abv_to_sugar(desired_abv)
         st.write(
             f"**Resulting Sugar Content:** {resulting_sugar_content.asNumber(units.g / units.L):.2f} g/L"
         )
 
-        # Display maximum potential ABV and corresponding sugar content
         max_sugar = max_sugar_content.asNumber(units.g / units.L)
         st.write(f"**Maximum Potential ABV:** {max_abv.asNumber():.2f}%")
         st.write(f"**Maximum Sugar Content:** {max_sugar:.2f} g/L")
 
         fig, ax = plt.subplots()
-        # Benchmark wines
         for item in BENCHMARK:
             if item["abv"] is None:
                 ax.axhline(item["rs"].asNumber(), color="black", alpha=0.7)
@@ -464,7 +543,6 @@ def display_ingredient_calculator():
                     verticalalignment="bottom",
                 )
 
-        # Yeast vertical Lines
         for item in YEAST:
             ax.axvline(item["max_abv"], color="orange", alpha=0.7)
             ax.text(
@@ -493,13 +571,22 @@ def display_ingredient_calculator():
         st.pyplot(fig)
 
 
-tab_ingredient, tab_calc, tab_measurement, tab_mass, tab_rack, tab_bottle = st.tabs(
-    ["Ingredient", "Calculator", "SG", "Mass", "Rack", "Bottle"]
-)
+(
+    tab_start,
+    tab_ingredient,
+    tab_calc,
+    tab_measurement,
+    tab_mass,
+    tab_rack,
+    tab_bottle,
+) = st.tabs(["Start", "Ingredient", "Calculator", "SG", "Mass", "Rack", "Bottle"])
 
 with get_db() as db:
+    with tab_start:
+        start_fermentation_form()
+        st.dataframe(all_container_log_info(db)[::-1], hide_index=True)
+
     with tab_ingredient:
-        # Query and choose ingredient added
         ingredient_names = [
             i.name for i in db.query(Ingredient).order_by(asc(Ingredient.name)).all()
         ]
@@ -507,13 +594,12 @@ with get_db() as db:
         options = ingredient_names + ["*New Ingredient"]
         ingredient_name = st.selectbox("Ingredient Added", options=options)
 
-        # Create text input for user entry
         if ingredient_name == "*New Ingredient":
             add_new_ingredient(db)
 
-        add_fermentation_ingredient(ingredient_name=ingredient_name)
+        add_ingredient_addition_form(ingredient_name=ingredient_name)
 
-        st.dataframe(all_ferm_ingredients_info(db)[::-1], hide_index=True)
+        st.dataframe(all_ingredient_additions_info(db)[::-1], hide_index=True)
 
     with tab_measurement:
         add_sg_measurement_form(db)
@@ -528,8 +614,8 @@ with get_db() as db:
 
     with tab_rack:
         rack_form(db)
-        st.dataframe(all_vessel_log_info(db)[::-1], hide_index=True)
+        st.dataframe(all_container_log_info(db)[::-1], hide_index=True)
 
     with tab_bottle:
         bottle_form(db)
-        st.dataframe(all_bottle_info(db), hide_index=True)
+        st.dataframe(all_containers_info(db, container_type="bottle"), hide_index=True)

@@ -2,10 +2,13 @@ import streamlit as st
 from datetime import datetime
 import logging
 
-# SQL
 from sqlalchemy import desc
-from alcopt.database.models import Bottle, Review
-from alcopt.database.utils import get_db
+from alcopt.database.models import Container, Review
+from alcopt.database.utils import (
+    get_db,
+    current_fermentation_log,
+    latest_fermentation_log,
+)
 from alcopt.auth import show_login_status, is_admin
 from alcopt.utils import (
     reviews_to_df,
@@ -55,7 +58,7 @@ with st.form("Tasting Form"):
         name = email
     else:
         name = st.text_input("Full Name", placeholder="John Doe", autocomplete="on")
-    bottle_id = st.number_input("Bottle ID", value=0, min_value=0, step=1)
+    container_id = st.number_input("Container ID", value=0, min_value=0, step=1)
     date = st.date_input("Tasting Date")
     overall_rating = st.slider(
         "Overall Rating", value=3.0, min_value=1.0, max_value=5.0, step=0.1
@@ -107,42 +110,47 @@ with st.form("Tasting Form"):
     )
 
     if st.form_submit_button("Submit"):
-        if bottle_id == 0:
-            st.error("Please input a valid Bottle ID")
+        if container_id == 0:
+            st.error("Please input a valid Container ID")
         else:
-            # Open a session
             with get_db() as db:
-                review_date = datetime.now()  # Replace with the actual review_date
+                review_dt = datetime.combine(date, datetime.now().time())
 
-                bottle = db.query(Bottle).filter_by(id=bottle_id).first()
+                container = db.query(Container).filter_by(id=container_id).first()
 
-                if not bottle:
-                    st.error(f"No bottle found with id {bottle_id}")
-                elif bottle.fermentation_id is None:
-                    st.error("Bottle is empty!")
+                if not container:
+                    st.error(f"No container found with id {container_id}")
                 else:
-                    # Create a new review
-                    new_review = Review(
-                        bottle_id=bottle_id,
-                        name=name,
-                        fermentation_id=bottle.fermentation_id,
-                        overall_rating=overall_rating,
-                        boldness=boldness,
-                        tannicity=tannicity,
-                        sweetness=sweetness,
-                        acidity=acidity,
-                        complexity=complexity,
-                        review_date=date,
-                    )
+                    # Resolve fermentation: prefer the log active at review time;
+                    # fall back to the most recent log row (e.g. for a bottle whose
+                    # log was never explicitly closed).
+                    log = current_fermentation_log(db, container_id, review_dt)
+                    if log is None:
+                        log = latest_fermentation_log(db, container_id)
+                    if log is None:
+                        st.error(
+                            f"Container {container_id} has never held a fermentation"
+                        )
+                    else:
+                        new_review = Review(
+                            container_id=container_id,
+                            name=name,
+                            fermentation_id=log.fermentation_id,
+                            overall_rating=overall_rating,
+                            boldness=boldness,
+                            tannicity=tannicity,
+                            sweetness=sweetness,
+                            acidity=acidity,
+                            complexity=complexity,
+                            review_date=date,
+                        )
+                        db.add(new_review)
+                        db.commit()
 
-                    # Add and commit the review to the session
-                    db.add(new_review)
-                    db.commit()
-
-                    st.success("Review added successfully!")
-                    logging.info(
-                        f"Tasting Form Submitted by {name} for Bottle ID {bottle_id}"
-                    )
+                        st.success("Review added successfully!")
+                        logging.info(
+                            f"Tasting Form Submitted by {name} for Container ID {container_id}"
+                        )
 
 
 with get_db() as db:

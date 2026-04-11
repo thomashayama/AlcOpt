@@ -1,84 +1,83 @@
 import pandas as pd
 
 from alcopt.database.models import (
-    FermentationIngredient,
-    Bottle,
-    FermentationVesselLog,
+    Container,
+    ContainerFermentationLog,
+    IngredientAddition,
     SpecificGravityMeasurement,
-    Vessel,
 )
 
 
-def all_ferm_ingredients_info(session):
-    fermentation_ingredients = session.query(FermentationIngredient).all()
-    fermentation_ingredients_list = [
-        {
-            "ID": fermentation_ingredient.id,
-            "Amount": fermentation_ingredient.amount,
-            "Unit": fermentation_ingredient.unit,
-            "Date Added": fermentation_ingredient.added_at,
-            "Fermentation ID": fermentation_ingredient.fermentation_id,
-        }
-        for fermentation_ingredient in fermentation_ingredients
-    ]
-    return pd.DataFrame(fermentation_ingredients_list)
+def all_ingredient_additions_info(session):
+    additions = session.query(IngredientAddition).all()
+    return pd.DataFrame(
+        [
+            {
+                "ID": a.id,
+                "Container ID": a.container_id,
+                "Ingredient": a.ingredient.name if a.ingredient else None,
+                "Amount": a.amount,
+                "Unit": a.unit,
+                "Added At": a.added_at,
+            }
+            for a in additions
+        ]
+    )
 
 
-def all_vessel_log_info(session):
-    vessel_logs = session.query(FermentationVesselLog).all()
-    vessel_logs_list = [
-        {
-            "ID": vessel_log.id,
-            "Fermentation ID": vessel_log.fermentation_id,
-            "Vessel ID": vessel_log.vessel_id,
-            "Start Date": vessel_log.start_date,
-            "End Date": vessel_log.end_date,
-        }
-        for vessel_log in vessel_logs
-    ]
-    return pd.DataFrame(vessel_logs_list)
+def all_container_log_info(session):
+    logs = session.query(ContainerFermentationLog).all()
+    return pd.DataFrame(
+        [
+            {
+                "ID": log.id,
+                "Container ID": log.container_id,
+                "Fermentation ID": log.fermentation_id,
+                "Stage": log.stage,
+                "Source Container": log.source_container_id,
+                "Start": log.start_date,
+                "End": log.end_date,
+                "Amount": log.amount,
+                "Unit": log.unit,
+            }
+            for log in logs
+        ]
+    )
 
 
 def all_sg_measurement_info(session):
     measurements = session.query(SpecificGravityMeasurement).all()
-    measurements_list = [
-        {
-            "ID": measurement.id,
-            "Fermentation ID": measurement.fermentation_id,
-            "Specific Gravity": measurement.specific_gravity,
-            "Measurement Date": measurement.measurement_date,
-        }
-        for measurement in measurements
-    ]
-    return pd.DataFrame(measurements_list)
+    return pd.DataFrame(
+        [
+            {
+                "ID": m.id,
+                "Fermentation ID": m.fermentation_id,
+                "Specific Gravity": m.specific_gravity,
+                "Measurement Date": m.measurement_date,
+            }
+            for m in measurements
+        ]
+    )
 
 
-def all_bottle_info(session):
-    bottles = session.query(Bottle).all()
-    bottles_list = [
-        {
-            "ID": bottle.id,
-            "Volume (L)": bottle.volume_liters,
-            "Empty Mass (g)": bottle.empty_mass,
-            "Date Added": bottle.date_added,
-            "Fermentation ID": bottle.fermentation_id,
-            "Bottling Date": bottle.bottling_date,
-        }
-        for bottle in bottles
-    ]
-    return pd.DataFrame(bottles_list)
-
-
-def all_vessels_info(session):
-    vessels = session.query(Vessel).all()
-    vessels_list = [
-        {
-            "ID": vessel.id,
-            "Volume (L)": vessel.volume_liters,
-            "Empty Mass (g)": vessel.empty_mass,
-            "Date Added": vessel.date_added,
-            "Fermentation ID": vessel.fermentation_id,
-        }
-        for vessel in vessels
-    ]
-    return pd.DataFrame(vessels_list)
+def all_containers_info(session, container_type: str | None = None):
+    """Return container rows. Filter by `container_type` to get just bottles or
+    just carboys, or pass None to get everything.
+    """
+    q = session.query(Container)
+    if container_type is not None:
+        q = q.filter(Container.container_type == container_type)
+    return pd.DataFrame(
+        [
+            {
+                "ID": c.id,
+                "Type": c.container_type,
+                "Volume (L)": c.volume_liters,
+                "Material": c.material,
+                "Empty Mass (g)": c.empty_mass,
+                "Date Added": c.date_added,
+                "Notes": c.notes,
+            }
+            for c in q.all()
+        ]
+    )

@@ -4,6 +4,7 @@ from sqlalchemy import (
     Integer,
     String,
     Date,
+    DateTime,
     REAL,
     ForeignKey,
     CheckConstraint,
@@ -14,15 +15,34 @@ from datetime import datetime
 Base = declarative_base()
 
 
-class Vessel(Base):
-    __tablename__ = "vessels"
+class Container(Base):
+    """A physical container that can hold liquid for a fermentation.
+
+    Replaces the previous separate Vessel and Bottle tables. The role of the
+    container (carboy, demijohn, bottle, etc.) is recorded as free-text in
+    `container_type`. Containers are reusable across fermentations — the
+    "what is currently in this container" relationship lives in
+    ContainerFermentationLog, not on this row.
+    """
+
+    __tablename__ = "containers"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=True)
+    container_type = Column(String, nullable=False)
     volume_liters = Column(REAL)
     material = Column(String)
     empty_mass = Column(REAL)
     date_added = Column(Date, default=datetime.now)
-    # fermentation = relationship("Fermentation", back_populates="bottles")
+    notes = Column(String)
+
+    fermentation_logs = relationship(
+        "ContainerFermentationLog",
+        back_populates="container",
+        foreign_keys="ContainerFermentationLog.container_id",
+    )
+    ingredient_additions = relationship(
+        "IngredientAddition", back_populates="container"
+    )
+    reviews = relationship("Review", back_populates="container")
 
 
 class Ingredient(Base):
@@ -42,37 +62,66 @@ class Fermentation(Base):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date)
     end_mass = Column(REAL)
-    vessel_logs = relationship("FermentationVesselLog", back_populates="fermentation")
-    ingredients = relationship("FermentationIngredient", back_populates="fermentation")
+
+    container_logs = relationship(
+        "ContainerFermentationLog", back_populates="fermentation"
+    )
     measurements = relationship(
         "SpecificGravityMeasurement", back_populates="fermentation"
     )
-    bottles = relationship("Bottle", back_populates="fermentation")
-    bottle_logs = relationship("BottleLog", back_populates="fermentation")
-    reviews = relationship("Review", back_populates="fermentation")
     mass_measurements = relationship("MassMeasurement", back_populates="fermentation")
+    reviews = relationship("Review", back_populates="fermentation")
 
 
-class FermentationVesselLog(Base):
-    __tablename__ = "fermentation_vessel_logs"
+class ContainerFermentationLog(Base):
+    """Records that container X held fermentation Y over a date range.
+
+    Replaces FermentationVesselLog and BottleLog. A row with `end_date IS NULL`
+    is considered currently active. The invariant — that opening a new log row
+    for a container closes any prior open row — is enforced in app code via
+    `alcopt.database.utils.close_open_log`.
+    """
+
+    __tablename__ = "container_fermentation_logs"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    container_id = Column(Integer, ForeignKey("containers.id"), nullable=False)
     fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=False)
-    vessel_id = Column(Integer, ForeignKey("vessels.id"), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date)
-    fermentation = relationship("Fermentation", back_populates="vessel_logs")
-    vessel = relationship("Vessel")
-
-
-class FermentationIngredient(Base):
-    __tablename__ = "fermentation_ingredients"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=False)
-    ingredient_id = Column(Integer, ForeignKey("ingredients.id"), nullable=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime)
+    source_container_id = Column(Integer, ForeignKey("containers.id"))
     amount = Column(REAL)
     unit = Column(String)
-    added_at = Column(Date, nullable=False)
-    fermentation = relationship("Fermentation", back_populates="ingredients")
+    stage = Column(String)
+
+    container = relationship(
+        "Container", back_populates="fermentation_logs", foreign_keys=[container_id]
+    )
+    source_container = relationship("Container", foreign_keys=[source_container_id])
+    fermentation = relationship("Fermentation", back_populates="container_logs")
+
+
+class IngredientAddition(Base):
+    """An ingredient added to (or removed from) a container at a specific time.
+
+    Replaces FermentationIngredient and BottleIngredient. Note: this row has
+    no `fermentation_id`. The fermentation context is derived by joining
+    against ContainerFermentationLog on `(container_id, added_at)`. This is
+    deliberate: it lets you log additions to a container that has no active
+    fermentation (pre-soak, post-bottle, aging additions).
+
+    Amount is signed: positive = added, negative = removed/sampled.
+    """
+
+    __tablename__ = "ingredient_additions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    container_id = Column(Integer, ForeignKey("containers.id"), nullable=False)
+    ingredient_id = Column(Integer, ForeignKey("ingredients.id"), nullable=False)
+    added_at = Column(DateTime, nullable=False)
+    amount = Column(REAL)
+    unit = Column(String)
+    notes = Column(String)
+
+    container = relationship("Container", back_populates="ingredient_additions")
     ingredient = relationship("Ingredient")
 
 
@@ -94,50 +143,10 @@ class MassMeasurement(Base):
     fermentation = relationship("Fermentation", back_populates="mass_measurements")
 
 
-class Bottle(Base):
-    __tablename__ = "bottles"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=True)
-    bottling_date = Column(Date, nullable=True, default=None)
-    volume_liters = Column(REAL)
-    empty_mass = Column(REAL)
-    date_added = Column(Date, default=datetime.now)
-    fermentation = relationship("Fermentation", back_populates="bottles")
-    ingredients = relationship("BottleIngredient", back_populates="bottle")
-    bottle_logs = relationship("BottleLog", back_populates="bottle")
-    reviews = relationship("Review", back_populates="bottle")
-
-
-class BottleIngredient(Base):
-    __tablename__ = "bottle_ingredients"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    bottle_id = Column(Integer, ForeignKey("bottles.id"), nullable=False)
-    ingredient_id = Column(Integer, ForeignKey("ingredients.id"), nullable=False)
-    amount = Column(REAL)
-    unit = Column(String)
-    added_at = Column(Date, nullable=False)
-    bottle = relationship("Bottle", back_populates="ingredients")
-    ingredient = relationship("Ingredient")
-
-
-class BottleLog(Base):
-    __tablename__ = "bottle_log"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=False)
-    vessel_id = Column(Integer, ForeignKey("vessels.id"), nullable=False)
-    bottle_id = Column(Integer, ForeignKey("bottles.id"), nullable=False)
-    bottling_date = Column(Date, nullable=False)
-    amount = Column(REAL)
-    unit = Column(String)
-    fermentation = relationship("Fermentation", back_populates="bottle_logs")
-    bottle = relationship("Bottle", back_populates="bottle_logs")
-    vessel = relationship("Vessel")
-
-
 class Review(Base):
     __tablename__ = "reviews"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    bottle_id = Column(Integer, ForeignKey("bottles.id"), nullable=False)
+    container_id = Column(Integer, ForeignKey("containers.id"), nullable=False)
     name = Column(String)
     fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=False)
     overall_rating = Column(
@@ -162,10 +171,9 @@ class Review(Base):
     )
     review_date = Column(Date, nullable=False)
     fermentation = relationship("Fermentation", back_populates="reviews")
-    bottle = relationship("Bottle", back_populates="reviews")
+    container = relationship("Container", back_populates="reviews")
 
 
 if __name__ == "__main__":
-    # Set up the database
     engine = create_engine("sqlite:///alcopt.db")
     Base.metadata.create_all(engine)
