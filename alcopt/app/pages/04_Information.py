@@ -11,7 +11,6 @@ from alcopt.database.models import (
     Container,
     ContainerFermentationLog,
     Fermentation,
-    IngredientAddition,
     SpecificGravityMeasurement,
     Review,
 )
@@ -21,6 +20,7 @@ from alcopt.database.utils import (
     current_fermentation_log,
     latest_fermentation_log,
 )
+from alcopt.database.queries import get_fermentation_ingredient_additions
 from alcopt.auth import show_login_status
 
 st.set_page_config(
@@ -40,18 +40,8 @@ def display_fermentation_info(db, fermentation):
     st.write(f"**End Date:** {fermentation.end_date}")
 
     st.subheader("Ingredients")
-    # Get all ingredient additions for containers that were part of this fermentation
-    logs = (
-        db.query(ContainerFermentationLog)
-        .filter_by(fermentation_id=fermentation.id)
-        .all()
-    )
-    container_ids = {log.container_id for log in logs}
-    ingredients = (
-        db.query(IngredientAddition)
-        .filter(IngredientAddition.container_id.in_(container_ids))
-        .all()
-    )
+    # Only include additions that fell within a log window for this fermentation
+    ingredients = get_fermentation_ingredient_additions(db, fermentation.id)
     if ingredients:
         ingredients_df = pd.DataFrame(
             [
@@ -76,7 +66,12 @@ def display_fermentation_info(db, fermentation):
         st.write("No ingredients added yet.")
 
     # Calculate yield from bottle logs
-    bottle_logs = [log for log in logs if log.stage == "bottled"]
+    all_logs = (
+        db.query(ContainerFermentationLog)
+        .filter_by(fermentation_id=fermentation.id)
+        .all()
+    )
+    bottle_logs = [log for log in all_logs if log.stage == "bottled"]
     initial_volume = np.sum(
         [
             ing.amount
