@@ -103,11 +103,10 @@ class ContainerFermentationLog(Base):
 class IngredientAddition(Base):
     """An ingredient added to (or removed from) a container at a specific time.
 
-    Replaces FermentationIngredient and BottleIngredient. Note: this row has
-    no `fermentation_id`. The fermentation context is derived by joining
-    against ContainerFermentationLog on `(container_id, added_at)`. This is
-    deliberate: it lets you log additions to a container that has no active
-    fermentation (pre-soak, post-bottle, aging additions).
+    Replaces FermentationIngredient and BottleIngredient. The container_id is
+    the primary scope. The fermentation context is derived by joining against
+    ContainerFermentationLog on (container_id, added_at). This lets you log
+    additions to a container with no active fermentation (pre-soak, aging, etc.).
 
     Amount is signed: positive = added, negative = removed/sampled.
     """

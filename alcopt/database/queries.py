@@ -44,11 +44,12 @@ def get_container_ingredient_additions(db: Session, container_id: int):
 
 
 def get_fermentation_ingredient_additions(db: Session, fermentation_id: int):
-    """All ingredient additions whose container was running this fermentation
-    at the time of addition.
+    """All ingredient additions whose container held this fermentation at
+    the time of addition.
 
-    Joins ingredient_additions to container_fermentation_logs on container_id
-    and filters where added_at falls inside [start_date, end_date).
+    Uses inclusive bounds [start_date, end_date] on container_fermentation_logs.
+    The data has been adjusted so that adjacent log windows don't share exact
+    boundary timestamps, making inclusive comparison safe.
     """
     return (
         db.query(IngredientAddition)
@@ -60,7 +61,7 @@ def get_fermentation_ingredient_additions(db: Session, fermentation_id: int):
             ContainerFermentationLog.fermentation_id == fermentation_id,
             ContainerFermentationLog.start_date <= IngredientAddition.added_at,
             (ContainerFermentationLog.end_date.is_(None))
-            | (ContainerFermentationLog.end_date > IngredientAddition.added_at),
+            | (ContainerFermentationLog.end_date >= IngredientAddition.added_at),
         )
         .order_by(IngredientAddition.added_at)
         .all()

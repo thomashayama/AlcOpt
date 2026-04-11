@@ -123,13 +123,16 @@ def display_fermentation_info(db, fermentation):
         initial_sg = measurements[0].specific_gravity
         final_sg = measurements[-1].specific_gravity
         abv = sg_diff_to_abv(initial_sg - final_sg)
-        initial_rs = get_sugar(ingredients) / (initial_volume * mL)
-        rs_diff = abv_to_sugar(sg_diff_to_abv(initial_sg - final_sg))
-        residual_sugar = initial_rs - rs_diff
         st.markdown(f"**~ABV (%)**: {abv:.2f}")
-        st.markdown(
-            f"**~Residual Sugar (g/L)**: {residual_sugar.asUnit(units.g / units.L).asNumber():.2f}"
-        )
+        if initial_volume > 0:
+            initial_rs = get_sugar(ingredients) / (initial_volume * mL)
+            rs_diff = abv_to_sugar(sg_diff_to_abv(initial_sg - final_sg))
+            residual_sugar = initial_rs - rs_diff
+            st.markdown(
+                f"**~Residual Sugar (g/L)**: {residual_sugar.asUnit(units.g / units.L).asNumber():.2f}"
+            )
+        else:
+            st.write("Cannot estimate residual sugar (no liquid ingredient volume).")
 
         measurements_df = pd.DataFrame(
             [
