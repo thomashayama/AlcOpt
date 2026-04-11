@@ -1,104 +1,37 @@
 # AlcOpt
 
-Fermentation tracking and optimization Streamlit app.
+Fermentation tracking and optimization Streamlit app. Multi-page Streamlit frontend, SQLAlchemy ORM, Google OAuth, SQLite locally and PostgreSQL in production (Railway).
 
-## Project Structure
+## Environment
 
-```
-alcopt/
-├── app/                    # Streamlit multi-page app
-│   ├── Home.py             # Landing page (leaderboard, analytics)
-│   └── pages/
-│       ├── 01_Tasting_Form.py
-│       ├── 02_Brew_Log.py      # Admin only
-│       ├── 03_Bottle_Log.py    # Admin only
-│       └── 04_Information.py
-├── auth.py                 # Google OAuth2 authentication
-├── database/
-│   ├── models.py           # SQLAlchemy ORM models
-│   ├── queries.py          # Analytics queries (leaderboard)
-│   └── utils.py            # DB session management, init
-├── utils.py                # Fermentation math, unit conversions, plotting
-└── streamlit_utils.py      # ORM-to-DataFrame display helpers
-```
+- **OS**: Windows 11. You're running under a bash shell (Git Bash / MSYS), so use Unix syntax (`/dev/null`, forward slashes), not Windows cmd syntax. Long-running commands may behave differently than on Linux — prefer `uv run` wrappers over bare binaries.
+- **Python**: 3.11, managed by [uv](https://docs.astral.sh/uv/). Always invoke project code via `uv run ...` so the correct interpreter and venv are used.
+- **Database**: SQLite at `data/alcopt.db` locally; `DATABASE_URL` env var overrides. Schema is the source of truth — it's defined in `alcopt/database/models.py` and materialized by `init_db()` via `Base.metadata.create_all`. There are no migrations.
 
-## Key Concepts
+## Domain model (non-obvious)
 
-- **Fermentation** is the central entity. It has containers, ingredient additions, SG/mass measurements, and reviews.
-- **Containers** are physical vessels (carboys, demijohns, bottles, etc.) unified in a single `containers` table with a `container_type` column. They are reusable across fermentations.
-- **ContainerFermentationLog** records which container held which fermentation over what date range. This is the single source of truth for container contents — there are no denormalized FK caches.
-- **IngredientAddition** records ingredients added to a container at a specific time. These are scoped to `container_id`, not `fermentation_id` — the fermentation is derived via the log. This allows adding ingredients before, during, or after fermentation (pre-soak, aging, post-bottling).
-- **Reviews** rate any container (not just bottles) on 6 attributes (1-5 scale): overall, boldness, tannicity, sweetness, acidity, complexity.
-- Admin-only pages are gated by `is_admin()` which checks the user's email against `ADMIN_EMAILS` env var.
+These relationships matter for any query or feature work and aren't obvious from the schema alone:
 
-## Database
+- **Containers** are physical vessels (carboys, demijohns, bottles, …) unified in one `containers` table with a `container_type` discriminator. They are reused across fermentations.
+- **ContainerFermentationLog** is the single source of truth for which container held which fermentation over what date range. There are no denormalized FK caches on `containers` or `fermentations` — always join through the log.
+- **IngredientAddition** rows are scoped to `container_id`, not `fermentation_id`. The fermentation is derived via the log. This is intentional — it supports pre-soak, aging, and post-bottling additions that fall outside the fermentation window.
+- Date-range joins against the log use **inclusive** `start_date` / `end_date` bounds. Recent bugs (see `da8ef87`, `7adff36`) came from treating `end_date` as exclusive.
+- **Reviews** rate any container (not only bottles) on 6 attributes (1–5): overall, boldness, tannicity, sweetness, acidity, complexity.
+- Admin-only pages are gated by `is_admin()`, which checks the user's email against the `ADMIN_EMAILS` env var.
 
-- Default: SQLite at `data/alcopt.db`
-- Connection string set via `DATABASE_URL` env var
-- Schema defined via SQLAlchemy models in `alcopt/database/models.py`
-- Schema is the source of truth; `init_db()` calls `Base.metadata.create_all`
-
-## Running
+## Common commands
 
 ```bash
-# Docker (production)
-docker compose up -d app
-
-# Docker (dev, with live reload)
-docker compose up -d app-dev
-
-# Local
-uv run streamlit run alcopt/app/Home.py
+uv run streamlit run alcopt/app/Home.py   # run app locally
+uv run ruff check alcopt/ scripts/        # lint
+uv run ruff format alcopt/ scripts/       # format
+docker compose up -d app-dev              # dev container (live reload)
 ```
 
-## Configuration
+Run `ruff check` and `ruff format` before committing — both must pass with zero issues.
 
-All config via environment variables (see `.env.example`):
-- `DATABASE_URL` — database connection URI
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth2 credentials
-- `GOOGLE_REDIRECT_URI` — OAuth redirect URL
-- `ADMIN_EMAILS` — comma-separated admin emails
-- Config loaded centrally in `alcopt/config.py`
+## Deployment notes
 
-## Deployment
-
-- Dockerized with `python:3.11-slim-bookworm` base image
-- Designed to run as a **git submodule** in a deploy monorepo (separate repos on GitHub, combined for deploy)
-- **Railway** is the hosting platform:
-  - Root directory set to this submodule's path in the deploy repo
-  - Railway Postgres service provides `DATABASE_URL` env var (auto-linked)
-  - `PORT` env var is set automatically by Railway and used in the Dockerfile CMD
-  - All config via env vars (set in Railway dashboard)
-- SQLite locally, PostgreSQL in production
-- Base URL path set to `/alcopt` in `.streamlit/config.toml`
-
-## Tooling
-
-This project uses [uv](https://docs.astral.sh/uv/) for Python version management, dependency management, and running commands. Always use `uv run` to execute project code — it ensures the correct Python version and virtualenv are active.
-
-```bash
-uv run streamlit run alcopt/app/Home.py   # run the app
-uv run python scripts/some_script.py      # run a script
-uv run ruff check alcopt/                 # run linter
-uv add <package>                          # add a dependency
-uv remove <package>                       # remove a dependency
-uv sync                                   # install from lockfile
-```
-
-## Linting & Formatting
-
-This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
-
-```bash
-uv run ruff check alcopt/ scripts/
-uv run ruff check --fix alcopt/ scripts/
-uv run ruff format alcopt/ scripts/
-```
-
-Run `ruff check` and `ruff format` before committing. Both should pass with zero issues.
-
-## Dependencies
-
-Managed with uv. Dependencies defined in `pyproject.toml`, locked in `uv.lock`. Python 3.11.
-
-Core: streamlit, streamlit-oauth, sqlalchemy, pandas, numpy, matplotlib, seaborn, unum, opencv-python, psycopg2-binary
+- This repo is consumed as a **git submodule** inside a separate deploy monorepo. Don't add deploy-repo-specific config here.
+- Hosted on **Railway**. `DATABASE_URL` and `PORT` are injected by Railway; Postgres is the prod DB. Base URL path is `/alcopt` (set in `.streamlit/config.toml`).
+- All config flows through env vars — see `.env.example` and `alcopt/config.py`.

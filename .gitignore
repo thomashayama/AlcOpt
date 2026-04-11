@@ -12,3 +12,5 @@ secrets.dev.toml
 build
 
 data/logs/*
+
+.claude/settings.local.json
