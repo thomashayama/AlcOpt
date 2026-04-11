@@ -2,15 +2,20 @@
 Migrate data from local SQLite (data/alcopt.db) to a PostgreSQL server.
 
 Usage:
-    python scripts/sqlite_to_postgres.py <POSTGRES_URL>
+    python scripts/sqlite_to_postgres.py <POSTGRES_URL> [--wipe]
 
 The postgres URL should be in the format:
     postgresql://user:password@host:port/dbname
 
 You can copy this from the Railway dashboard (DATABASE_URL).
 If the URL starts with postgres://, it will be converted to postgresql://.
+
+Pass --wipe to DROP SCHEMA public CASCADE on the target before migrating.
+Required when the target has a stale schema (e.g. pre-containers-refactor
+tables) or existing rows that would conflict on primary key.
 """
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -44,10 +49,10 @@ TABLES_IN_ORDER = [
     Review,
 ]
 
-SQLITE_PATH = Path(__file__).resolve().parent.parent / "alcopt.db"
+SQLITE_PATH = Path(__file__).resolve().parent.parent / "data" / "alcopt.db"
 
 
-def migrate(postgres_url: str):
+def migrate(postgres_url: str, wipe: bool = False):
     # Normalize postgres:// to postgresql://
     if postgres_url.startswith("postgres://"):
         postgres_url = postgres_url.replace("postgres://", "postgresql://", 1)
@@ -59,6 +64,12 @@ def migrate(postgres_url: str):
 
     SqliteSession = sessionmaker(bind=sqlite_engine)
     PgSession = sessionmaker(bind=pg_engine)
+
+    if wipe:
+        print("Wiping target: DROP SCHEMA public CASCADE")
+        with pg_engine.begin() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
 
     # Create all tables on postgres
     Base.metadata.create_all(bind=pg_engine)
@@ -104,21 +115,39 @@ def migrate(postgres_url: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python scripts/sqlite_to_postgres.py <POSTGRES_URL>")
-        sys.exit(1)
-
-    postgres_url = sys.argv[1]
-    print(f"Source: {SQLITE_PATH}")
-    print(
-        f"Target: {postgres_url.split('@')[0].split('://')[0]}://***@{postgres_url.split('@')[-1]}"
+    parser = argparse.ArgumentParser(
+        description="Migrate data/alcopt.db into a Postgres server."
     )
+    parser.add_argument("postgres_url", help="Target Postgres URL")
+    parser.add_argument(
+        "--wipe",
+        action="store_true",
+        help="DROP SCHEMA public CASCADE on the target before migrating. "
+        "Required when the target has a stale schema or conflicting rows.",
+    )
+    args = parser.parse_args()
+
+    postgres_url = args.postgres_url
+    redacted = (
+        f"{postgres_url.split('://', 1)[0]}://***@{postgres_url.split('@', 1)[-1]}"
+    )
+    print(f"Source: {SQLITE_PATH}")
+    print(f"Target: {redacted}")
+    print(f"Wipe:   {args.wipe}")
     print()
 
-    confirm = input("This will INSERT data into the target database. Continue? [y/N] ")
+    if args.wipe:
+        prompt = (
+            "This will DROP ALL TABLES on the target and replace them "
+            "with data from the local SQLite DB. Continue? [y/N] "
+        )
+    else:
+        prompt = "This will INSERT data into the target database. Continue? [y/N] "
+
+    confirm = input(prompt)
     if confirm.lower() != "y":
         print("Aborted.")
         sys.exit(0)
 
     print()
-    migrate(postgres_url)
+    migrate(postgres_url, wipe=args.wipe)
