@@ -72,7 +72,7 @@ def current_fermentation_log(
     else:
         q = q.filter(ContainerFermentationLog.start_date <= at).filter(
             (ContainerFermentationLog.end_date.is_(None))
-            | (ContainerFermentationLog.end_date > at)
+            | (ContainerFermentationLog.end_date >= at)
         )
     return q.order_by(ContainerFermentationLog.start_date.desc()).first()
 
