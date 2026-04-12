@@ -33,5 +33,5 @@ Run `ruff check` and `ruff format` before committing — both must pass with zer
 ## Deployment notes
 
 - This repo is consumed as a **git submodule** inside a separate deploy monorepo. Don't add deploy-repo-specific config here.
-- Hosted on **Railway**. `DATABASE_URL` and `PORT` are injected by Railway; Postgres is the prod DB. Base URL path is `/alcopt` (set in `.streamlit/config.toml`).
+- Hosted on **Railway** at `alcopt.thomashayama.com` (subdomain — the apex `thomashayama.com` belongs to a separate Railway project for the personal site). `DATABASE_URL` and `PORT` are injected by Railway; Postgres is the prod DB. App is served at the root of its subdomain — no `baseUrlPath` override.
 - All config flows through env vars — see `.env.example` and `alcopt/config.py`.
