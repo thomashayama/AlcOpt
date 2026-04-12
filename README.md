@@ -12,7 +12,7 @@
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 [![License](https://img.shields.io/github/license/thomashayama/AlcOpt?branch=Main)](https://github.com/thomashayama/AlcOpt/blob/Main/LICENSE)
 
-Deployed to https://www.thomashayama.com/alcopt
+Deployed to https://alcopt.thomashayama.com/
 
 A fermentation tracking and optimization web app. Log brews, track ingredients, record specific gravity and mass measurements, manage vessels and bottles, and review finished products with detailed tasting profiles.
 
