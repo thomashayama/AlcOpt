@@ -2,9 +2,10 @@
 
 import { Suspense, useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { theme } from '@/lib/theme';
-import type { ContainerInfoResponse, IngredientAdditionOut } from '@/lib/types';
+import type { ContainerInfoResponse } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,43 +94,30 @@ function InfoPage() {
       .sort((a, b) => a.days - b.days);
   }, [data]);
 
-  const ingredientsWithDays = useMemo<
-    (IngredientAdditionOut & { daysFromStart: number | null })[]
-  >(() => {
-    if (!data || !data.fermentation) return [];
-    const startDate = data.fermentation.start_date;
-    return data.ingredients.map((ing) => ({
-      ...ing,
-      daysFromStart: ing.date_added ? daysBetween(startDate, ing.date_added) : null,
-    }));
-  }, [data]);
+  const ingredients = data?.ingredients ?? [];
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-8">
       <h1 className="text-3xl font-bold">Container Information</h1>
 
       {/* Lookup form */}
-      <Card>
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="flex items-end gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="container-id">Container ID</Label>
-              <Input
-                id="container-id"
-                type="number"
-                min={1}
-                placeholder="Enter container ID"
-                value={containerId}
-                onChange={(e) => setContainerId(e.target.value)}
-                className="w-48"
-              />
-            </div>
-            <Button type="submit" disabled={!containerId || loading}>
-              {loading ? 'Loading...' : 'Look Up'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <form onSubmit={handleSubmit} className="flex items-end justify-center gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="container-id">Container ID</Label>
+          <Input
+            id="container-id"
+            type="number"
+            min={1}
+            placeholder="Enter ID"
+            value={containerId}
+            onChange={(e) => setContainerId(e.target.value)}
+            className="w-32"
+          />
+        </div>
+        <Button type="submit" disabled={!containerId || loading}>
+          {loading ? 'Loading...' : 'Look Up'}
+        </Button>
+      </form>
 
       {error && (
         <Card>
@@ -141,12 +129,19 @@ function InfoPage() {
 
       {data && (
         <>
-          {/* Container Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Container #{data.container.id}</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Container #{data.container.id}</h2>
+            <Link href={`/tasting?container_id=${data.container.id}`}>
+              <Button>Submit Review</Button>
+            </Link>
+          </div>
+
+          {/* Container Details — collapsible */}
+          <details className="rounded-lg border border-border bg-card">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Container Details
+            </summary>
+            <div className="px-4 pb-4">
               <dl className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
                 <div>
                   <dt className="text-sm text-muted-foreground">Type</dt>
@@ -177,8 +172,8 @@ function InfoPage() {
                   </div>
                 )}
               </dl>
-            </CardContent>
-          </Card>
+            </div>
+          </details>
 
           {/* Fermentation Info */}
           {data.fermentation && (
@@ -309,12 +304,12 @@ function InfoPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {ingredientsWithDays.map((ing, i) => (
-                      <TableRow key={ing.id ?? i}>
-                        <TableCell>{ing.name}</TableCell>
+                    {ingredients.map((ing, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{ing.ingredient ?? '-'}</TableCell>
                         <TableCell>{ing.amount ?? '-'}</TableCell>
                         <TableCell>{ing.unit ?? '-'}</TableCell>
-                        <TableCell>{ing.daysFromStart ?? '-'}</TableCell>
+                        <TableCell>{ing.days_from_start ?? '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

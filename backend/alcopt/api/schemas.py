@@ -178,6 +178,7 @@ class LeaderboardEntry(BaseModel):
 class UserInfo(BaseModel):
     email: str
     picture: str = ""
+    name: str = ""
     is_admin: bool = False
 
 

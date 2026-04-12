@@ -30,14 +30,12 @@ import {
 import { ResponsiveHeatMap } from '@nivo/heatmap';
 
 interface RatingAbvPoint {
-  fermentation_id: number;
-  avg_rating: number;
+  overall_rating: number;
   abv: number;
 }
 
 interface RatingRsPoint {
-  fermentation_id: number;
-  avg_rating: number;
+  overall_rating: number;
   residual_sugar: number;
 }
 
@@ -163,7 +161,7 @@ export default function HomePage() {
   }, [reviews]);
 
   const abvScatter = useMemo(
-    () => ratingsAbv.map((p) => ({ x: p.abv, y: p.avg_rating })),
+    () => ratingsAbv.map((p) => ({ x: p.abv, y: p.overall_rating })),
     [ratingsAbv],
   );
   const abvReg = useMemo(() => linearRegression(abvScatter), [abvScatter]);
@@ -173,7 +171,7 @@ export default function HomePage() {
   );
 
   const rsScatter = useMemo(
-    () => ratingsRs.map((p) => ({ x: p.residual_sugar, y: p.avg_rating })),
+    () => ratingsRs.map((p) => ({ x: p.residual_sugar, y: p.overall_rating })),
     [ratingsRs],
   );
   const rsReg = useMemo(() => linearRegression(rsScatter), [rsScatter]);
@@ -278,9 +276,10 @@ export default function HomePage() {
                   }}
                   colors={{
                     type: 'diverging',
-                    scheme: 'red_yellow_green',
-                    minValue: -1,
-                    maxValue: 1,
+                    scheme: 'red_yellow_blue',
+                    minValue: 1,
+                    maxValue: -1,
+                    divergeAt: 0.5,
                   }}
                   emptyColor="#3A2F2A"
                   borderWidth={1}

@@ -18,7 +18,11 @@ def get_current_user(token: str | None = Cookie(None)):
     payload = decode_jwt(token)
     if not payload:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
-    return {"email": payload["sub"], "picture": payload.get("picture", "")}
+    return {
+        "email": payload["sub"],
+        "picture": payload.get("picture", ""),
+        "name": payload.get("name", ""),
+    }
 
 
 def get_optional_user(token: str | None = Cookie(None)):
@@ -27,7 +31,11 @@ def get_optional_user(token: str | None = Cookie(None)):
     payload = decode_jwt(token)
     if not payload:
         return None
-    return {"email": payload["sub"], "picture": payload.get("picture", "")}
+    return {
+        "email": payload["sub"],
+        "picture": payload.get("picture", ""),
+        "name": payload.get("name", ""),
+    }
 
 
 def require_admin(user: dict = Depends(get_current_user)):

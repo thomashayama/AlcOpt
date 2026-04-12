@@ -66,10 +66,11 @@ def get_user_info(access_token: str) -> dict | None:
         return None
 
 
-def create_jwt(email: str, picture: str = "") -> str:
+def create_jwt(email: str, picture: str = "", name: str = "") -> str:
     payload = {
         "sub": email,
         "picture": picture,
+        "name": name,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS),
     }

@@ -13,6 +13,8 @@ from alcopt.api.dependencies import get_current_user
 from alcopt.api.schemas import UserInfo
 from alcopt.config import FRONTEND_URL
 
+_SECURE_COOKIE = FRONTEND_URL.startswith("https")
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _pending_states: dict[str, bool] = {}
@@ -38,14 +40,15 @@ def callback(code: str, state: str):
     user_info = get_user_info(token_data["access_token"])
     email = user_info.get("email", "") if user_info else ""
     picture = user_info.get("picture", "") if user_info else ""
+    name = user_info.get("given_name", "") if user_info else ""
 
-    jwt_token = create_jwt(email, picture)
+    jwt_token = create_jwt(email, picture, name)
     response = RedirectResponse(FRONTEND_URL)
     response.set_cookie(
         "token",
         jwt_token,
         httponly=True,
-        secure=True,
+        secure=_SECURE_COOKIE,
         samesite="lax",
         max_age=7 * 24 * 3600,
     )
@@ -57,6 +60,7 @@ def me(user: dict = Depends(get_current_user)):
     return UserInfo(
         email=user["email"],
         picture=user["picture"],
+        name=user.get("name", ""),
         is_admin=is_admin(user["email"]),
     )
 
