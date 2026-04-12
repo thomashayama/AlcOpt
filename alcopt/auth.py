@@ -35,46 +35,31 @@ def logout():
 
 
 def show_login_status():
-    """Display login button or user profile in the sidebar"""
-
+    """Display login button or user profile in the sidebar."""
     with st.sidebar:
-        st.markdown(
-            """
-            <style>
-                .profile-img {
-                    border-radius: 50%;
-                    width: 40px;
-                    height: 40px;
-                }
-                .logout-button {
-                    border: none;
-                    background: none;
-                    color: red;
-                    cursor: pointer;
-                    font-size: 16px;
-                    padding: 5px;
-                }
-            </style>
-            <div class="header-container">
-        """,
-            unsafe_allow_html=True,
-        )
-
         token = get_user_token()
-
         if token:
-            col_pic, col_logout = st.columns([1, 2])
-            with col_pic:
+            st.divider()
+            pic_col, info_col = st.columns([1, 2], vertical_alignment="center")
+            with pic_col:
                 st.image(
                     st.session_state.get(
-                        "profile_pic", "https://via.placeholder.com/50"
+                        "profile_pic", "https://via.placeholder.com/64"
                     ),
-                    width=40,
+                    width=56,
                 )
-            with col_logout:
-                if st.button("Logout", key="sidebar_logout"):
-                    logout()
-
+            with info_col:
+                email = st.session_state.get("user_email", "")
+                if email:
+                    st.markdown(f"**{email.split('@')[0]}**")
+                    st.caption(email)
+            if st.button(
+                "Sign out",
+                key="sidebar_logout",
+                use_container_width=True,
+                type="secondary",
+            ):
+                logout()
     return token
 
 

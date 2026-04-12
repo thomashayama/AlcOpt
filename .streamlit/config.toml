@@ -1,0 +1,7 @@
+# Wine-cellar theme. Keep these values in sync with alcopt/theme.py.
+[theme]
+base = "dark"
+primaryColor = "#A4243B"
+backgroundColor = "#1A1410"
+secondaryBackgroundColor = "#2A1F1A"
+textColor = "#F5F0E8"

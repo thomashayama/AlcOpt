@@ -17,8 +17,10 @@ from alcopt.utils import (
 )
 
 st.set_page_config(
-    page_title="Home",
+    page_title="AlcOpt",
     page_icon="🍷",
+    layout="centered",
+    initial_sidebar_state="expanded",
 )
 
 logging.basicConfig(
@@ -30,22 +32,39 @@ init_db()
 # Display login/logout button in the sidebar
 show_login_status()
 
-st.markdown(
-    """# AlcOpt""",
-    help="Web App for recording tastings, brewing information, and tracking bottling.",
-)
-st.markdown(
-    '<a href="./Tasting_Form" target="_self">Go to Tasting Form</a>',
-    unsafe_allow_html=True,
+st.title("AlcOpt")
+st.caption("Track tastings, brews, and bottles. Optimize the next batch.")
+st.page_link(
+    "pages/01_Tasting_Form.py",
+    label="Submit a tasting",
+    icon=":material/rate_review:",
 )
 
-# Fermentation Average Ratings in a Leaderboard
-st.markdown("## Fermentation Leaderboard")
-
+st.divider()
+st.subheader("Fermentation Leaderboard")
 
 with get_db() as db:
     leaderboard_df = get_fermentation_leaderboard(db)
-    st.dataframe(leaderboard_df, hide_index=True)
+    leaderboard_df.insert(0, "Rank", range(1, len(leaderboard_df) + 1))
+    st.dataframe(
+        leaderboard_df,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Rank": st.column_config.NumberColumn("Rank", width="small"),
+            "Fermentation ID": st.column_config.NumberColumn(
+                "Fermentation", width="small"
+            ),
+            "Average Rating": st.column_config.ProgressColumn(
+                "Avg rating",
+                help="Average overall rating across all reviews (out of 5)",
+                format="%.2f",
+                min_value=0,
+                max_value=5,
+            ),
+            "# Ratings": st.column_config.NumberColumn("Reviews", width="small"),
+        },
+    )
 
     # Plots
     reviews = db.query(Review).all()
