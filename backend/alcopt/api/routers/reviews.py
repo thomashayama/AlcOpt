@@ -3,7 +3,12 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from alcopt.api.dependencies import get_current_user, get_db, require_admin
+from alcopt.api.dependencies import (
+    get_current_user,
+    get_db,
+    get_optional_user,
+    require_admin,
+)
 from alcopt.api.schemas import ReviewCreate, ReviewOut
 from alcopt.database.models import Container, Review
 from alcopt.database.utils import current_fermentation_log, latest_fermentation_log
@@ -15,8 +20,12 @@ router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 def create_review(
     body: ReviewCreate,
     db: Session = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict | None = Depends(get_optional_user),
 ):
+    email = user["email"] if user else body.email
+    if not email:
+        raise HTTPException(400, "Email is required when not logged in")
+
     container = db.query(Container).get(body.container_id)
     if not container:
         raise HTTPException(404, f"Container {body.container_id} not found")
@@ -30,7 +39,7 @@ def create_review(
 
     review = Review(
         container_id=body.container_id,
-        name=user["email"],
+        name=email,
         fermentation_id=log.fermentation_id,
         overall_rating=body.overall_rating,
         boldness=body.boldness,

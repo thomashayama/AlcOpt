@@ -87,6 +87,7 @@ class ReviewOut(BaseModel):
 class ReviewCreate(BaseModel):
     container_id: int
     tasting_date: date
+    email: str | None = None
     overall_rating: float = Field(ge=1.0, le=5.0)
     boldness: float = Field(ge=1.0, le=5.0)
     tannicity: float = Field(ge=1.0, le=5.0)

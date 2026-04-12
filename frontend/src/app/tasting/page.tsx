@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
 import type { ReviewOut } from '@/lib/types';
@@ -45,7 +45,6 @@ export default function TastingPageWrapper() {
 
 function TastingPage() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const prefilledId = searchParams.get('container_id');
 
@@ -63,6 +62,7 @@ function TastingPage() {
     acidity: 3.0,
     complexity: 3.0,
   });
+  const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
@@ -71,12 +71,6 @@ function TastingPage() {
 
   const [reviews, setReviews] = useState<ReviewOut[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/');
-    }
-  }, [loading, user, router]);
 
   const fetchReviews = async () => {
     try {
@@ -105,9 +99,10 @@ function TastingPage() {
         container_id: containerId,
         tasting_date: tastingDate,
         ...ratings,
+        ...(user ? {} : { email }),
       });
       setMessage({ type: 'success', text: 'Review submitted successfully!' });
-      fetchReviews();
+      if (user) fetchReviews();
     } catch (err) {
       setMessage({
         type: 'error',
@@ -126,16 +121,33 @@ function TastingPage() {
     );
   }
 
-  if (!user) return null;
-
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-8">
       <Card>
         <CardHeader>
           <CardTitle>Tasting Form</CardTitle>
+          {!user && (
+            <p className="text-sm text-muted-foreground">
+              You&apos;re not logged in. Enter your email below to submit a review.
+              Log in with Google to see your review history.
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {!user && (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="container_id">Container ID</Label>
@@ -208,47 +220,49 @@ function TastingPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Review History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {reviewsLoading ? (
-            <p className="text-sm text-muted-foreground">Loading reviews...</p>
-          ) : reviews.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No reviews yet.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Container</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Overall</TableHead>
-                  <TableHead>Boldness</TableHead>
-                  <TableHead>Tannicity</TableHead>
-                  <TableHead>Sweetness</TableHead>
-                  <TableHead>Acidity</TableHead>
-                  <TableHead>Complexity</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reviews.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.container_id}</TableCell>
-                    <TableCell>{r.review_date}</TableCell>
-                    <TableCell>{r.overall_rating.toFixed(1)}</TableCell>
-                    <TableCell>{r.boldness.toFixed(1)}</TableCell>
-                    <TableCell>{r.tannicity.toFixed(1)}</TableCell>
-                    <TableCell>{r.sweetness.toFixed(1)}</TableCell>
-                    <TableCell>{r.acidity.toFixed(1)}</TableCell>
-                    <TableCell>{r.complexity.toFixed(1)}</TableCell>
+      {user && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Review History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {reviewsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading reviews...</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No reviews yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Container</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Overall</TableHead>
+                    <TableHead>Boldness</TableHead>
+                    <TableHead>Tannicity</TableHead>
+                    <TableHead>Sweetness</TableHead>
+                    <TableHead>Acidity</TableHead>
+                    <TableHead>Complexity</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {reviews.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>{r.container_id}</TableCell>
+                      <TableCell>{r.review_date}</TableCell>
+                      <TableCell>{r.overall_rating.toFixed(1)}</TableCell>
+                      <TableCell>{r.boldness.toFixed(1)}</TableCell>
+                      <TableCell>{r.tannicity.toFixed(1)}</TableCell>
+                      <TableCell>{r.sweetness.toFixed(1)}</TableCell>
+                      <TableCell>{r.acidity.toFixed(1)}</TableCell>
+                      <TableCell>{r.complexity.toFixed(1)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
