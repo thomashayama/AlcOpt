@@ -95,22 +95,28 @@ def _draw_truchet_cell(
             c.arc(x - r, y + size - r, x + r, y + size + r, 270, 90)
 
 
-def _draw_tiling(c: canvas.Canvas, x0, y0, w, h, seed: int):
+def _draw_tiling(
+    c: canvas.Canvas,
+    x0,
+    y0,
+    w,
+    h,
+    seed: int,
+    tile_size: float = 0.15 * inch,
+    num_arcs: int = 4,
+):
     """Fill rectangle (x0, y0, w, h) with random curved Truchet tiles."""
     rng = random.Random(seed)
-    tile_s = 0.15 * inch
-    num_arcs = 4
-
     c.setLineCap(1)  # round caps for smooth joins
-    ncols = int(w / tile_s) + 2
-    nrows = int(h / tile_s) + 2
+    ncols = int(w / tile_size) + 2
+    nrows = int(h / tile_size) + 2
     for tr in range(nrows):
         for tc in range(ncols):
             _draw_truchet_cell(
                 c,
-                x0 + tc * tile_s,
-                y0 + tr * tile_s,
-                tile_s,
+                x0 + tc * tile_size,
+                y0 + tr * tile_size,
+                tile_size,
                 rng.randint(0, 1),
                 num_arcs,
             )
@@ -119,7 +125,17 @@ def _draw_tiling(c: canvas.Canvas, x0, y0, w, h, seed: int):
 # ── Label drawing ───────────────────────────────────────────────────────
 
 
-def _draw_label(c: canvas.Canvas, container_id: int, x0, y0, w, h, base_url: str):
+def _draw_label(
+    c: canvas.Canvas,
+    container_id: int,
+    x0,
+    y0,
+    w,
+    h,
+    base_url: str,
+    tile_size: float = 0.15 * inch,
+    num_arcs: int = 4,
+):
     display_url = container_url(container_id, base_url)
     display_url = display_url.removeprefix("https://").removeprefix("http://")
     qr_data = container_url(container_id, base_url)
@@ -130,86 +146,59 @@ def _draw_label(c: canvas.Canvas, container_id: int, x0, y0, w, h, base_url: str
     text_right = x0 + w - pad
     max_text_w = w - 2 * pad
 
-    # ── Truchet tiling background (clipped to label) ──
-    c.saveState()
-    clip = c.beginPath()
-    clip.rect(x0, y0, w, h)
-    c.clipPath(clip, stroke=0)
+    # XOR text: drawn before tiling, gets white-tiling inversion
+    xor_draws: list[tuple] = []
 
-    c.setStrokeColorRGB(0.78, 0.78, 0.78)
-    c.setLineWidth(0.35)
-    _draw_tiling(c, x0, y0, w, h, seed=container_id)
+    def _draw_xor(text, x, y, font_name, font_size, align="left"):
+        c.setFont(font_name, font_size)
+        tw = c.stringWidth(text, font_name, font_size)
+        if align == "center":
+            c.drawCentredString(x, y, text)
+            xor_draws.append((text, x - tw / 2, y, font_name, font_size))
+        elif align == "right":
+            c.drawRightString(x, y, text)
+            xor_draws.append((text, x - tw, y, font_name, font_size))
+        else:
+            c.drawString(x, y, text)
+            xor_draws.append((text, x, y, font_name, font_size))
 
-    # "Wine" embedded in the tiling — dark tiling inside letters, black outline
-    wine_size = 36
-    c.setFont("Helvetica-Bold", wine_size)
-    wine_tw = c.stringWidth("Wine", "Helvetica-Bold", wine_size)
-    wine_y = y0 + h - pad - wine_size * 0.82
-
-    # Draw dark tiling clipped to text shape
-    c.saveState()
-    textobj = c.beginText()
-    textobj.setTextOrigin(cx - wine_tw / 2, wine_y)
-    textobj.setFont("Helvetica-Bold", wine_size)
-    textobj.setTextRenderMode(7)  # add text outline to clip path
-    textobj.textLine("Wine")
-    c.drawText(textobj)
-
-    c.setStrokeColorRGB(0.25, 0.25, 0.25)
-    c.setLineWidth(0.5)
-    _draw_tiling(c, x0, y0, w, h, seed=container_id)
-    c.restoreState()
-
-    # Black outline around the letters
-    textobj2 = c.beginText()
-    textobj2.setTextOrigin(cx - wine_tw / 2, wine_y)
-    textobj2.setFont("Helvetica-Bold", wine_size)
-    textobj2.setTextRenderMode(1)  # stroke only
-    textobj2.textLine("Wine")
-    c.setStrokeColorRGB(0, 0, 0)
-    c.setLineWidth(1)
-    c.drawText(textobj2)
-
-    c.restoreState()  # restore label clip
-
-    # ── Top-down: separator + container ID ──
+    # ══════════════════════════════════════════════════════════════════════
+    # Phase 1 — Draw headline text (gets XOR inversion later)
+    # ══════════════════════════════════════════════════════════════════════
     c.setFillColorRGB(0, 0, 0)
+
+    top = y0 + h - pad
+
+    # Wine title
+    wine_size = 36
+    wine_y = top - wine_size * 0.82
+    _draw_xor("Wine", cx, wine_y, "Helvetica-Bold", wine_size, "center")
     top = wine_y - 7
 
+    # Separator
     c.setStrokeColorRGB(0, 0, 0)
     c.setLineWidth(0.3)
     c.line(text_left, top, text_right, top)
     top -= 2
 
+    # Container ID
     id_size = 18
-    c.setFont("Helvetica-Bold", id_size)
-    id_text = str(container_id)
-    id_tw = c.stringWidth(id_text, "Helvetica-Bold", id_size)
     id_baseline = top - id_size * 0.8
-
-    # White halo — thick white stroke erases tiling behind the number
-    c.saveState()
-    c.setFillColorRGB(1, 1, 1)
-    c.setStrokeColorRGB(1, 1, 1)
-    c.setLineWidth(6)
-    c.setLineJoin(1)  # round joins
-    textobj = c.beginText()
-    textobj.setTextOrigin(text_right - id_tw, id_baseline)
-    textobj.setFont("Helvetica-Bold", id_size)
-    textobj.setTextRenderMode(2)  # fill + stroke
-    textobj.textLine(id_text)
-    c.drawText(textobj)
-    c.restoreState()
-
-    # Black number on top
-    c.setFillColorRGB(0, 0, 0)
-    c.drawRightString(text_right, id_baseline, id_text)
+    _draw_xor(
+        str(container_id),
+        text_right,
+        id_baseline,
+        "Helvetica-Bold",
+        id_size,
+        "right",
+    )
     top = id_baseline - 4
 
-    # ── Bottom-up: legal text ──
+    # ══════════════════════════════════════════════════════════════════════
+    # Phase 2 — Calculate bottom layout positions (drawn later, on top)
+    # ══════════════════════════════════════════════════════════════════════
     bot = y0 + pad
 
-    # Government warning
     gov_warning = (
         "GOVERNMENT WARNING: (1) According to the Surgeon "
         "General, women should not drink alcoholic beverages "
@@ -220,41 +209,27 @@ def _draw_label(c: canvas.Canvas, container_id: int, x0, y0, w, h, base_url: str
     )
     gov_size = 4.5
     gov_lines = _wrap_text(c, gov_warning, "Helvetica", gov_size, max_text_w)
-    c.setFont("Helvetica", gov_size)
-    for line in reversed(gov_lines):
-        c.drawString(text_left, bot, line)
+    gov_start = bot
+    for _ in gov_lines:
         bot += gov_size + 1.5
     bot += 3
-
-    # Separator
-    c.setLineWidth(0.3)
-    c.line(text_left, bot, text_right, bot)
+    sep1_y = bot
     bot += 5
 
-    # Producer — left-aligned
     info_size = 5.5
-    c.setFont("Helvetica", info_size)
-    c.drawString(text_left, bot, "Produced & bottled by AlcOpt")
+    producer_y = bot
     bot += info_size + 3
-
-    # May contain sulfites — left-aligned
-    c.drawString(text_left, bot, "May Contain Sulfites")
-    # ABV + volume — right-aligned, same line, same size
-    c.drawRightString(text_right, bot, "Alc. xx% by vol.  |  xxx mL")
+    sulfites_y = bot
     bot += info_size + 4
-
-    # Separator
-    c.setLineWidth(0.3)
-    c.line(text_left, bot, text_right, bot)
+    sep2_y = bot
     bot += 4
 
-    # ── QR code + centered URL ──
     url_size = 6.0
     while (
         url_size > 4 and c.stringWidth(display_url, "Helvetica", url_size) > max_text_w
     ):
         url_size -= 0.5
-    url_band = url_size + 4
+    url_band = url_size * 2 + 6
 
     qr_top = top
     qr_bottom = bot + url_band + 2
@@ -264,9 +239,48 @@ def _draw_label(c: canvas.Canvas, container_id: int, x0, y0, w, h, base_url: str
     band_mid = (qr_top + qr_bottom) / 2
     qr_y = band_mid - qr_size / 2
     qr_x = x0 + (w - qr_size) / 2
-
-    # White background behind QR for reliable scanning
     qr_pad = 1
+    url_y = qr_y - url_size - url_size - 4
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Phase 3 — Light grey tiling overlay (full label)
+    # ══════════════════════════════════════════════════════════════════════
+    c.saveState()
+    clip = c.beginPath()
+    clip.rect(x0, y0, w, h)
+    c.clipPath(clip, stroke=0)
+
+    c.setStrokeColorRGB(0.75, 0.75, 0.75)
+    c.setLineWidth(0.35)
+    c.setLineCap(1)
+    _draw_tiling(
+        c, x0, y0, w, h, seed=container_id, tile_size=tile_size, num_arcs=num_arcs
+    )
+    c.restoreState()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Phase 4 — White tiling inside headline text (XOR inversion)
+    # ══════════════════════════════════════════════════════════════════════
+    c.saveState()
+    clip_text = c.beginText()
+    clip_text.setTextRenderMode(7)
+    for text, lx, by, fname, fsize in xor_draws:
+        clip_text.setTextOrigin(lx, by)
+        clip_text.setFont(fname, fsize)
+        clip_text.textLine(text)
+    c.drawText(clip_text)
+
+    c.setStrokeColorRGB(1, 1, 1)
+    c.setLineWidth(0.5)
+    c.setLineCap(1)
+    _draw_tiling(
+        c, x0, y0, w, h, seed=container_id, tile_size=tile_size, num_arcs=num_arcs
+    )
+    c.restoreState()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Phase 5 — Clean QR zone (white rect + QR image)
+    # ══════════════════════════════════════════════════════════════════════
     c.setFillColorRGB(1, 1, 1)
     c.rect(
         qr_x - qr_pad,
@@ -276,7 +290,6 @@ def _draw_label(c: canvas.Canvas, container_id: int, x0, y0, w, h, base_url: str
         fill=1,
         stroke=0,
     )
-
     c.drawImage(
         _qr_image(qr_data),
         qr_x,
@@ -287,10 +300,35 @@ def _draw_label(c: canvas.Canvas, container_id: int, x0, y0, w, h, base_url: str
         mask="auto",
     )
 
-    # URL centered below QR
+    # ══════════════════════════════════════════════════════════════════════
+    # Phase 6 — Bottom text ON TOP of tiling (no XOR, just black on grey)
+    # ══════════════════════════════════════════════════════════════════════
     c.setFillColorRGB(0, 0, 0)
+    c.setStrokeColorRGB(0, 0, 0)
+
+    # Government warning
+    c.setFont("Helvetica", gov_size)
+    temp = gov_start
+    for line in reversed(gov_lines):
+        c.drawString(text_left, temp, line)
+        temp += gov_size + 1.5
+
+    # Separators
+    c.setLineWidth(0.3)
+    c.line(text_left, sep1_y, text_right, sep1_y)
+    c.line(text_left, sep2_y, text_right, sep2_y)
+
+    # Producer
+    c.setFont("Helvetica", info_size)
+    c.drawString(text_left, producer_y, "Produced & bottled by AlcOpt")
+
+    # Sulfites + ABV
+    c.drawString(text_left, sulfites_y, "May Contain Sulfites")
+    c.drawRightString(text_right, sulfites_y, "Alc. xx% by vol.  |  xxx mL")
+
+    # URL
     c.setFont("Helvetica", url_size)
-    c.drawCentredString(cx, qr_y - url_size - 2, display_url)
+    c.drawCentredString(cx, url_y, display_url)
 
 
 # ── PDF generation ──────────────────────────────────────────────────────
