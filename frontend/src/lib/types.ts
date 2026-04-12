@@ -75,6 +75,7 @@ export interface LeaderboardEntry {
 export interface UserInfo {
   email: string;
   picture: string;
+  name: string;
   is_admin: boolean;
 }
 
@@ -89,11 +90,19 @@ export interface IngredientAdditionOut {
   notes?: string | null;
 }
 
+export interface ContainerIngredient {
+  ingredient: string | null;
+  amount: number | null;
+  unit: string | null;
+  days_from_start: number | null;
+  price: number | null;
+}
+
 export interface ContainerInfoResponse {
   container: ContainerOut;
   fermentation?: FermentationOut | null;
   fermentation_log?: ContainerLogOut | null;
-  ingredients: IngredientAdditionOut[];
+  ingredients: ContainerIngredient[];
   sg_measurements: SgMeasurementOut[];
   reviews: ReviewOut[];
   abv?: number | null;

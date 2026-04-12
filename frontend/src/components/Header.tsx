@@ -13,7 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 export function Header() {
   const { user, loading, login, logout } = useAuth();
 
-  const emailPrefix = user?.email?.split('@')[0] ?? '';
+  const rawName = user?.name || user?.email?.split('@')[0] || '';
+  const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   return (
     <header className="sticky top-0 z-50 border-b" style={{ backgroundColor: '#262730' }}>
@@ -25,9 +26,6 @@ export function Header() {
           </Link>
 
           <nav className="flex items-center gap-4 text-sm">
-            <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
-              Home
-            </Link>
             <Link href="/tasting" className="text-muted-foreground hover:text-foreground transition-colors">
               Tasting
             </Link>
@@ -58,14 +56,14 @@ export function Header() {
               <PopoverTrigger
                 className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
-                {emailPrefix}
+                {displayName}
               </PopoverTrigger>
               <PopoverContent className="w-64" align="end">
                 <div className="flex flex-col items-center gap-3 py-2">
                   <Avatar className="h-16 w-16" size="lg">
                     <AvatarImage src={user.picture} alt={user.email} />
                     <AvatarFallback>
-                      {emailPrefix.slice(0, 2).toUpperCase()}
+                      {displayName.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <p className="text-sm text-muted-foreground">{user.email}</p>

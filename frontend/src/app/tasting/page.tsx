@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
 import type { ReviewOut } from '@/lib/types';
@@ -35,11 +35,23 @@ const RATING_FIELDS = [
 
 type RatingKey = (typeof RATING_FIELDS)[number]['key'];
 
-export default function TastingPage() {
+export default function TastingPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
+      <TastingPage />
+    </Suspense>
+  );
+}
+
+function TastingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefilledId = searchParams.get('container_id');
 
-  const [containerId, setContainerId] = useState<number>(1);
+  const [containerId, setContainerId] = useState<number>(
+    prefilledId ? parseInt(prefilledId, 10) : 1,
+  );
   const [tastingDate, setTastingDate] = useState(
     new Date().toISOString().slice(0, 10),
   );

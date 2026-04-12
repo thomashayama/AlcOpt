@@ -40,8 +40,9 @@ def callback(code: str, state: str):
     user_info = get_user_info(token_data["access_token"])
     email = user_info.get("email", "") if user_info else ""
     picture = user_info.get("picture", "") if user_info else ""
+    name = user_info.get("given_name", "") if user_info else ""
 
-    jwt_token = create_jwt(email, picture)
+    jwt_token = create_jwt(email, picture, name)
     response = RedirectResponse(FRONTEND_URL)
     response.set_cookie(
         "token",
@@ -59,6 +60,7 @@ def me(user: dict = Depends(get_current_user)):
     return UserInfo(
         email=user["email"],
         picture=user["picture"],
+        name=user.get("name", ""),
         is_admin=is_admin(user["email"]),
     )
 
