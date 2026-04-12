@@ -286,4 +286,13 @@ def container_info_form():
         get_container_info(id_input)
 
 
+# Deep link from a QR-code label: /Information?container_id=42
+deep_link_id = st.query_params.get("container_id")
+if deep_link_id is not None:
+    try:
+        get_container_info(int(deep_link_id))
+    except (TypeError, ValueError):
+        st.error(f"Invalid container_id in URL: {deep_link_id!r}")
+    st.divider()
+
 container_info_form()
