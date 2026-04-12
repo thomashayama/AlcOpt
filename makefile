@@ -1,52 +1,27 @@
 # Variables
-PYTHON = python
-VENV_DIR = .venv
-ENV_FILE = .env
-APP_FILE = alcopt/app/main.py
 DOCKER_COMPOSE = docker compose
-PORT = 8501
 
-# Detect OS for virtual environment activation
-ifeq ($(OS),Windows_NT)
-    ACTIVATE = .venv\Scripts\activate
-else
-    ACTIVATE = . .venv/bin/activate
-endif
+# Run backend locally
+.PHONY: dev-backend
+dev-backend:
+	cd backend && uv run uvicorn alcopt.api.main:app --reload --port 8000
 
-# Create a virtual environment
-.PHONY: venv
-venv:
-	@echo "Creating virtual environment..."
-	$(PYTHON) -m venv $(VENV_DIR)
-	@echo "Activating virtual environment and installing dependencies..."
-	$(ACTIVATE) && pip install --upgrade pip && pip install -r requirements.txt
-
-# Install dependencies
-.PHONY: install
-install:
-	@echo "Installing dependencies..."
-	$(ACTIVATE) && pip install -r requirements.txt 
-
-# Load env vars and run Streamlit
-.PHONY: local
-local:
-	@echo "Loading environment from $(ENV_FILE)..."
-	$(ACTIVATE) && set -a && . ./$(ENV_FILE) && set +a && streamlit run $(APP_FILE) --server.port $(PORT) --server.fileWatcherType none
+# Run frontend locally
+.PHONY: dev-frontend
+dev-frontend:
+	cd frontend && npm run dev
 
 # Deploy with Docker Compose
 .PHONY: deploy
 deploy:
-	@echo "Deploying the app using Docker Compose..."
-	$(DOCKER_COMPOSE) up -d --build
+	$(DOCKER_COMPOSE) up -d --build backend frontend
 
 # Stop Docker Compose services
 .PHONY: stop
 stop:
-	@echo "Stopping Docker Compose services..."
 	$(DOCKER_COMPOSE) down
 
-# Clean virtual environment
+# Clean
 .PHONY: clean
 clean:
-	@echo "Cleaning up environment..."
-	rm -rf $(VENV_DIR) __pycache__ .streamlit
+	rm -rf backend/.venv backend/__pycache__ frontend/.next frontend/node_modules
