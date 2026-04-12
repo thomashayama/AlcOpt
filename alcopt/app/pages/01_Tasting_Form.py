@@ -9,24 +9,14 @@ from alcopt.database.utils import (
     current_fermentation_log,
     latest_fermentation_log,
 )
-from alcopt.auth import show_login_status, is_admin
+from alcopt.auth import is_admin, require_login
 from alcopt.utils import (
     reviews_to_df,
     plot_correlation_heatmap,
     plot_user_rating_distribution,
 )
 
-st.set_page_config(
-    page_title="Tasting Form",
-    page_icon="🍷",
-)
-
-# Show login/logout button
-token = show_login_status()
-
-if not token:
-    st.warning("🔒 Please log in to access this page.")
-    st.stop()
+require_login()
 
 email = st.session_state.get("user_email")
 with st.form("Tasting Form"):

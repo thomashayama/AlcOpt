@@ -8,7 +8,7 @@ services:
     volumes:
       - ./data:/data
     env_file: .env
-    command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=none"]
+    command: ["python", "-m", "streamlit", "run", "./alcopt/app/main.py", "--server.port=8501", "--server.fileWatcherType=none"]
     restart: unless-stopped
     networks:
       - thomashayama-net
@@ -23,7 +23,7 @@ services:
       - .:/app
       - ./data:/data
     env_file: .env
-    # command: ["python", "-m", "streamlit", "run", "./alcopt/app/Home.py", "--server.port=8501", "--server.fileWatcherType=watchdog"]
+    # command: ["python", "-m", "streamlit", "run", "./alcopt/app/main.py", "--server.port=8501", "--server.fileWatcherType=watchdog"]
     command: ["sleep", "infinity"]
     restart: unless-stopped
     networks:

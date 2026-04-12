@@ -48,7 +48,7 @@ make local
 
 # Or directly
 pip install -e .
-streamlit run alcopt/app/Home.py
+streamlit run alcopt/app/main.py
 ```
 
 ## Install

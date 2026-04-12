@@ -9,4 +9,4 @@ WORKDIR /app
 
 RUN uv sync --frozen
 
-CMD ["sh", "-c", "uv run streamlit run /app/alcopt/app/Home.py --server.port=$PORT --server.address=0.0.0.0"]
+CMD ["sh", "-c", "uv run streamlit run /app/alcopt/app/main.py --server.port=$PORT --server.address=0.0.0.0"]

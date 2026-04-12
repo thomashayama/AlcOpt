@@ -113,3 +113,19 @@ def get_user_info(token):
 def is_admin():
     """Checks if current user is admin"""
     return st.session_state.get("user_email") in ADMIN_EMAILS
+
+
+def require_login():
+    """Stop the page render if no user is logged in. Defense-in-depth — the
+    navigation router already hides gated pages from the sidebar."""
+    if not st.session_state.get("token"):
+        st.warning("Please log in to access this page.")
+        st.stop()
+
+
+def require_admin():
+    """Stop the page render if the current user is not an admin."""
+    require_login()
+    if not is_admin():
+        st.warning("Admin access required.")
+        st.stop()

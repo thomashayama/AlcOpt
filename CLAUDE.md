@@ -22,7 +22,7 @@ These relationships matter for any query or feature work and aren't obvious from
 ## Common commands
 
 ```bash
-uv run streamlit run alcopt/app/Home.py   # run app locally
+uv run streamlit run alcopt/app/main.py   # run app locally
 uv run ruff check alcopt/ scripts/        # lint
 uv run ruff format alcopt/ scripts/       # format
 docker compose up -d app-dev              # dev container (live reload)

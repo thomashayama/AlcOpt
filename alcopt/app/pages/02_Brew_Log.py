@@ -35,22 +35,9 @@ from alcopt.utils import (
     str2unit,
     calculate_max_potential_abv,
 )
-from alcopt.auth import show_login_status, is_admin
+from alcopt.auth import require_admin
 
-st.set_page_config(
-    page_title="Brew Tracking",
-    page_icon="🍷",
-)
-
-token = show_login_status()
-
-if not token:
-    st.warning("🔒 Please log in to access this page.")
-    st.stop()
-
-if not is_admin():
-    st.error("🔒 Admin Page")
-    st.stop()
+require_admin()
 
 logging.info(
     f"{st.session_state.get('user_email', 'unknown')} Accessed Brew Tracking Page"

@@ -2,7 +2,7 @@
 PYTHON = python
 VENV_DIR = .venv
 ENV_FILE = .env
-APP_FILE = alcopt/app/Home.py
+APP_FILE = alcopt/app/main.py
 DOCKER_COMPOSE = docker compose
 PORT = 8501
 

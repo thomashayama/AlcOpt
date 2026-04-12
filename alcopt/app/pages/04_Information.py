@@ -21,15 +21,6 @@ from alcopt.database.utils import (
     latest_fermentation_log,
 )
 from alcopt.database.queries import get_fermentation_ingredient_additions
-from alcopt.auth import show_login_status
-
-st.set_page_config(
-    page_title="Information",
-    page_icon="🍷",
-)
-
-# Show login/logout button
-token = show_login_status()
 
 
 def display_fermentation_info(db, fermentation):
@@ -275,8 +266,18 @@ def get_container_info(container_id):
             st.error(f"An error occurred: {e}")
 
 
+BOTTLE_ID_OFFSET = 18
+
+
 def container_info_form():
     st.title("Retrieve Container Information")
+    st.info(
+        f"Vessels and bottles are now unified as **containers**. If you're "
+        f"looking up a bottle by its old bottle ID, add **+{BOTTLE_ID_OFFSET}** "
+        f"to get its container ID (e.g. old bottle #5 is container "
+        f"#{5 + BOTTLE_ID_OFFSET}).",
+        icon=":material/info:",
+    )
 
     with st.form(key="container_info_form"):
         id_input = st.number_input("Container ID", min_value=1, step=1)
