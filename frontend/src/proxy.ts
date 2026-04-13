@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:8000';
 
-const protectedPaths = ['/tasting', '/brew', '/bottles', '/labels'];
+const protectedPaths = ['/brew', '/bottles', '/labels'];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -34,7 +34,6 @@ export const config = {
   matcher: [
     '/api/:path*',
     '/auth/:path*',
-    '/tasting/:path*',
     '/brew/:path*',
     '/bottles/:path*',
     '/labels/:path*',
