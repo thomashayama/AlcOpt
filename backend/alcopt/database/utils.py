@@ -20,6 +20,48 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()
+
+
+def _add_missing_columns():
+    """Add columns that exist in models but not in the database.
+
+    create_all() only creates new tables — it won't ALTER existing ones.
+    This handles the gap so that adding columns to models doesn't require
+    a manual migration on every deployment target.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    tables_with_timestamps = [
+        "containers",
+        "ingredients",
+        "fermentations",
+        "container_fermentation_logs",
+        "ingredient_additions",
+        "specific_gravity_measurements",
+        "mass_measurements",
+        "reviews",
+    ]
+    for table_name in tables_with_timestamps:
+        if table_name not in inspector.get_table_names():
+            continue
+        existing = {c["name"] for c in inspector.get_columns(table_name)}
+        with engine.begin() as conn:
+            if "created_at" not in existing:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE {table_name} "
+                        "ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    )
+                )
+            if "updated_at" not in existing:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE {table_name} "
+                        "ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    )
+                )
 
 
 @contextmanager
