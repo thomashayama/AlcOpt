@@ -7,7 +7,9 @@ from alcopt.api.dependencies import get_db, require_admin
 from alcopt.api.schemas import (
     AbvCalcRequest,
     ContainerLogOut,
+    EmptyContainerResponse,
     IngredientAdditionCreate,
+    IngredientAdditionResponse,
     IngredientCreate,
     IngredientOut,
     MassMeasurementCreate,
@@ -45,7 +47,7 @@ router = APIRouter(prefix="/api/brew", tags=["brew"])
 
 
 def _get_container(db: Session, container_id: int) -> Container:
-    container = db.query(Container).get(container_id)
+    container = db.get(Container, container_id)
     if not container:
         raise HTTPException(404, f"Container {container_id} not found")
     return container
@@ -58,11 +60,10 @@ def start_fermentation(
     _admin: dict = Depends(require_admin),
 ):
     _get_container(db, body.container_id)
-    fermentation = Fermentation(start_date=body.start_date)
+    start_dt = datetime.combine(body.start_date, datetime.min.time())
+    fermentation = Fermentation(start_date=start_dt)
     db.add(fermentation)
     db.flush()
-
-    start_dt = datetime.combine(body.start_date, datetime.min.time())
     close_open_log(db, body.container_id, start_dt)
 
     log = ContainerFermentationLog(
@@ -113,7 +114,7 @@ def list_ingredients(
     return db.query(Ingredient).order_by(Ingredient.name).all()
 
 
-@router.post("/additions")
+@router.post("/additions", response_model=IngredientAdditionResponse)
 def add_ingredient_addition(
     body: IngredientAdditionCreate,
     db: Session = Depends(get_db),
@@ -233,6 +234,7 @@ def rack(
         raise HTTPException(400, "No active fermentation on source container")
 
     close_open_log(db, body.from_container_id, rack_dt)
+    db.flush()
     close_open_log(db, body.to_container_id, rack_dt)
 
     log = ContainerFermentationLog(
@@ -279,7 +281,7 @@ def bottle(
     return log
 
 
-@router.post("/empty/{container_id}")
+@router.post("/empty/{container_id}", response_model=EmptyContainerResponse)
 def empty_container(
     container_id: int,
     db: Session = Depends(get_db),
@@ -303,7 +305,7 @@ def calculate_abv(
 
     ingredients_data = []
     for item in body.ingredients:
-        ingredient = db.query(Ingredient).get(item.ingredient_id)
+        ingredient = db.get(Ingredient, item.ingredient_id)
         if not ingredient:
             raise HTTPException(404, f"Ingredient {item.ingredient_id} not found")
         if item.unit not in str2unit:

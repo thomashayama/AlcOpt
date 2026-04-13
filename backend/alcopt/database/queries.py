@@ -1,6 +1,6 @@
 import pandas as pd
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from alcopt.database.models import (
@@ -53,6 +53,7 @@ def get_fermentation_ingredient_additions(db: Session, fermentation_id: int):
     """
     return (
         db.query(IngredientAddition)
+        .options(joinedload(IngredientAddition.ingredient))
         .join(
             ContainerFermentationLog,
             ContainerFermentationLog.container_id == IngredientAddition.container_id,

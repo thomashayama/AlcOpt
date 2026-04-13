@@ -1,5 +1,8 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
 
 from alcopt.auth import (
     build_login_url,
@@ -9,29 +12,39 @@ from alcopt.auth import (
     get_user_info,
     is_admin,
 )
-from alcopt.api.dependencies import get_current_user
+from alcopt.api.dependencies import get_current_user, get_db
 from alcopt.api.schemas import UserInfo
 from alcopt.config import FRONTEND_URL
+from alcopt.database.models import OAuthState
 
 _SECURE_COOKIE = FRONTEND_URL.startswith("https")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_pending_states: dict[str, bool] = {}
+_STATE_TTL = timedelta(minutes=10)
+
+
+def _cleanup_expired(db: Session):
+    cutoff = datetime.now() - _STATE_TTL
+    db.query(OAuthState).filter(OAuthState.created_at < cutoff).delete()
 
 
 @router.get("/login")
-def login():
+def login(db: Session = Depends(get_db)):
+    _cleanup_expired(db)
     state = generate_state()
-    _pending_states[state] = True
+    db.add(OAuthState(state=state, created_at=datetime.now()))
+    db.commit()
     return {"url": build_login_url(state)}
 
 
 @router.get("/callback")
-def callback(code: str, state: str):
-    if state not in _pending_states:
+def callback(code: str, state: str, db: Session = Depends(get_db)):
+    row = db.get(OAuthState, state)
+    if not row:
         return RedirectResponse(f"{FRONTEND_URL}?error=invalid_state")
-    del _pending_states[state]
+    db.delete(row)
+    db.commit()
 
     token_data = exchange_code(code)
     if not token_data or "access_token" not in token_data:

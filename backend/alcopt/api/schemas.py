@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ContainerOut(BaseModel):
@@ -47,8 +47,8 @@ class IngredientCreate(BaseModel):
 
 class FermentationOut(BaseModel):
     id: int
-    start_date: date
-    end_date: date | None = None
+    start_date: datetime
+    end_date: datetime | None = None
     end_mass: float | None = None
 
     model_config = {"from_attributes": True}
@@ -108,7 +108,7 @@ class SgMeasurementOut(BaseModel):
 class SgMeasurementCreate(BaseModel):
     container_id: int
     measurement_date: date
-    specific_gravity: float
+    specific_gravity: float = Field(ge=0.8, le=1.2)
 
 
 class MassMeasurementOut(BaseModel):
@@ -123,7 +123,7 @@ class MassMeasurementOut(BaseModel):
 class MassMeasurementCreate(BaseModel):
     container_id: int
     measurement_date: date
-    mass: float
+    mass: float = Field(gt=0)
 
 
 class IngredientAdditionOut(BaseModel):
@@ -139,6 +139,9 @@ class IngredientAdditionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+VALID_UNITS = {"kg", "g", "L", "mL", "tsp", "tbsp"}
+
+
 class IngredientAdditionCreate(BaseModel):
     container_id: int
     ingredient_name: str
@@ -146,6 +149,15 @@ class IngredientAdditionCreate(BaseModel):
     starting_amount: float = 0.0
     ending_amount: float = 0.0
     unit: str = "g"
+
+    @field_validator("unit")
+    @classmethod
+    def validate_unit(cls, v: str) -> str:
+        if v not in VALID_UNITS:
+            raise ValueError(
+                f"Invalid unit '{v}'. Must be one of: {', '.join(sorted(VALID_UNITS))}"
+            )
+        return v
 
 
 class StartFermentationRequest(BaseModel):
@@ -192,6 +204,16 @@ class AbvCalcIngredient(BaseModel):
 class AbvCalcRequest(BaseModel):
     container_id: int
     ingredients: list[AbvCalcIngredient]
+
+
+class IngredientAdditionResponse(BaseModel):
+    id: int
+    fermentation_id: int | None = None
+    message: str
+
+
+class EmptyContainerResponse(BaseModel):
+    message: str
 
 
 class ContainerInfoResponse(BaseModel):

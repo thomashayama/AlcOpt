@@ -324,7 +324,7 @@ def _draw_label(
 
     # Sulfites + ABV
     c.drawString(text_left, sulfites_y, "May Contain Sulfites")
-    c.drawRightString(text_right, sulfites_y, "Alc. xx% by vol.  |  xxx mL")
+    c.drawRightString(text_right, sulfites_y, "Alc. __% by vol.  |  __ mL")
 
     # URL
     c.setFont("Helvetica", url_size)

@@ -15,7 +15,16 @@ from datetime import datetime
 Base = declarative_base()
 
 
-class Container(Base):
+class TimestampMixin:
+    """Adds created_at and updated_at columns to any model."""
+
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.now, onupdate=datetime.now, nullable=False
+    )
+
+
+class Container(TimestampMixin, Base):
     """A physical container that can hold liquid for a fermentation.
 
     Replaces the previous separate Vessel and Bottle tables. The role of the
@@ -45,7 +54,7 @@ class Container(Base):
     reviews = relationship("Review", back_populates="container")
 
 
-class Ingredient(Base):
+class Ingredient(TimestampMixin, Base):
     __tablename__ = "ingredients"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
@@ -56,11 +65,11 @@ class Ingredient(Base):
     notes = Column(String)
 
 
-class Fermentation(Base):
+class Fermentation(TimestampMixin, Base):
     __tablename__ = "fermentations"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime)
     end_mass = Column(REAL)
 
     container_logs = relationship(
@@ -73,7 +82,7 @@ class Fermentation(Base):
     reviews = relationship("Review", back_populates="fermentation")
 
 
-class ContainerFermentationLog(Base):
+class ContainerFermentationLog(TimestampMixin, Base):
     """Records that container X held fermentation Y over a date range.
 
     Replaces FermentationVesselLog and BottleLog. A row with `end_date IS NULL`
@@ -100,7 +109,7 @@ class ContainerFermentationLog(Base):
     fermentation = relationship("Fermentation", back_populates="container_logs")
 
 
-class IngredientAddition(Base):
+class IngredientAddition(TimestampMixin, Base):
     """An ingredient added to (or removed from) a container at a specific time.
 
     Replaces FermentationIngredient and BottleIngredient. The container_id is
@@ -124,7 +133,7 @@ class IngredientAddition(Base):
     ingredient = relationship("Ingredient")
 
 
-class SpecificGravityMeasurement(Base):
+class SpecificGravityMeasurement(TimestampMixin, Base):
     __tablename__ = "specific_gravity_measurements"
     id = Column(Integer, primary_key=True, autoincrement=True)
     fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=False)
@@ -133,7 +142,7 @@ class SpecificGravityMeasurement(Base):
     fermentation = relationship("Fermentation", back_populates="measurements")
 
 
-class MassMeasurement(Base):
+class MassMeasurement(TimestampMixin, Base):
     __tablename__ = "mass_measurements"
     id = Column(Integer, primary_key=True, autoincrement=True)
     fermentation_id = Column(Integer, ForeignKey("fermentations.id"), nullable=False)
@@ -142,7 +151,7 @@ class MassMeasurement(Base):
     fermentation = relationship("Fermentation", back_populates="mass_measurements")
 
 
-class Review(Base):
+class Review(TimestampMixin, Base):
     __tablename__ = "reviews"
     id = Column(Integer, primary_key=True, autoincrement=True)
     container_id = Column(Integer, ForeignKey("containers.id"), nullable=False)
@@ -171,6 +180,14 @@ class Review(Base):
     review_date = Column(Date, nullable=False)
     fermentation = relationship("Fermentation", back_populates="reviews")
     container = relationship("Container", back_populates="reviews")
+
+
+class OAuthState(Base):
+    """Short-lived CSRF state tokens for the OAuth login flow."""
+
+    __tablename__ = "oauth_states"
+    state = Column(String, primary_key=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
 
 
 if __name__ == "__main__":

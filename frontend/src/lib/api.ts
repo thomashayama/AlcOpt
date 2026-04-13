@@ -16,6 +16,7 @@ async function request<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
+    signal: AbortSignal.timeout(30_000),
     ...options,
     headers: {
       'Content-Type': 'application/json',

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from alcopt.api.dependencies import (
@@ -26,7 +26,7 @@ def create_review(
     if not email:
         raise HTTPException(400, "Email is required when not logged in")
 
-    container = db.query(Container).get(body.container_id)
+    container = db.get(Container, body.container_id)
     if not container:
         raise HTTPException(404, f"Container {body.container_id} not found")
 
@@ -70,7 +70,15 @@ def my_reviews(
 
 @router.get("", response_model=list[ReviewOut])
 def all_reviews(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
-    return db.query(Review).order_by(Review.review_date.desc()).all()
+    return (
+        db.query(Review)
+        .order_by(Review.review_date.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )

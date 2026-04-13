@@ -99,7 +99,8 @@ def test_create_review_invalid_rating(user_client):
     assert resp.status_code == 422
 
 
-def test_create_review_unauthenticated(client):
+def test_create_review_unauthenticated_no_email(client):
+    """Unauthenticated requests without an email field get 400."""
     resp = client.post(
         "/api/reviews",
         json={
@@ -113,7 +114,7 @@ def test_create_review_unauthenticated(client):
             "complexity": 3.0,
         },
     )
-    assert resp.status_code == 401
+    assert resp.status_code == 400
 
 
 def test_my_reviews(user_client):

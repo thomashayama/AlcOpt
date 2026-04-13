@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from alcopt.api.dependencies import get_db, get_current_user, require_admin
+from alcopt.api.dependencies import get_db, get_current_user, get_optional_user, require_admin
 from alcopt.api.main import app
 from alcopt.database.models import Base
 
@@ -63,6 +63,7 @@ def user_client():
     """Test client authenticated as a regular user."""
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: REGULAR_USER
+    app.dependency_overrides[get_optional_user] = lambda: REGULAR_USER
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

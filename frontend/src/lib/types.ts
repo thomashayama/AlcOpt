@@ -90,6 +90,17 @@ export interface IngredientAdditionOut {
   notes?: string | null;
 }
 
+export interface AdditionOut {
+  id: number;
+  container_id: number;
+  ingredient_id: number;
+  ingredient_name?: string;
+  date: string;
+  starting_amount?: number | null;
+  ending_amount?: number | null;
+  unit?: string | null;
+}
+
 export interface ContainerIngredient {
   ingredient: string | null;
   amount: number | null;

@@ -1,5 +1,4 @@
 from alcopt.database.models import (
-    Container,
     ContainerFermentationLog,
     IngredientAddition,
     SpecificGravityMeasurement,
@@ -49,22 +48,4 @@ def all_sg_measurement_info(session):
             "measurement_date": str(m.measurement_date) if m.measurement_date else None,
         }
         for m in measurements
-    ]
-
-
-def all_containers_info(session, container_type: str | None = None):
-    q = session.query(Container)
-    if container_type is not None:
-        q = q.filter(Container.container_type == container_type)
-    return [
-        {
-            "id": c.id,
-            "container_type": c.container_type,
-            "volume_liters": c.volume_liters,
-            "material": c.material,
-            "empty_mass": c.empty_mass,
-            "date_added": str(c.date_added) if c.date_added else None,
-            "notes": c.notes,
-        }
-        for c in q.all()
     ]

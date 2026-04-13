@@ -147,7 +147,7 @@ def calculate_max_potential_abv(ingredients):
             fermentation_volume,
         )
     else:
-        return 0, 0, fermentation_volume
+        return 0, 0 * units.g / units.L, fermentation_volume
 
 
 def reviews_to_df(reviews: list) -> list[dict]:
@@ -189,6 +189,7 @@ def get_ratings_abv_data(db: Session):
             "abv": (row.initial_sg - row.final_sg) * 131.25,
         }
         for row in data
+        if row.initial_sg is not None and row.final_sg is not None
     ]
 
 
@@ -213,4 +214,5 @@ def get_ratings_rs_data(db: Session):
             "residual_sugar": sg_to_sugar(row.final_sg),
         }
         for row in data
+        if row.final_sg is not None
     ]

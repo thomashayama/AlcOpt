@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from alcopt.api.dependencies import get_db, require_admin
@@ -40,18 +40,20 @@ def create_container(
 @router.get("", response_model=list[ContainerOut])
 def list_containers(
     container_type: str | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
     q = db.query(Container)
     if container_type:
         q = q.filter(Container.container_type == container_type)
-    return q.all()
+    return q.offset(offset).limit(limit).all()
 
 
 @router.get("/{container_id}", response_model=ContainerInfoResponse)
 def get_container_info(container_id: int, db: Session = Depends(get_db)):
-    container = db.query(Container).get(container_id)
+    container = db.get(Container, container_id)
     if not container:
         raise HTTPException(404, f"Container {container_id} not found")
 
@@ -70,7 +72,8 @@ def get_container_info(container_id: int, db: Session = Depends(get_db)):
         additions = get_fermentation_ingredient_additions(db, fermentation.id)
         start = fermentation.start_date
         for a in additions:
-            days = (a.added_at.date() - start).days if a.added_at and start else 0
+            start_date = start.date() if hasattr(start, "date") else start
+            days = (a.added_at.date() - start_date).days if a.added_at and start else 0
             ingredients.append(
                 {
                     "ingredient": a.ingredient.name if a.ingredient else None,
@@ -90,9 +93,8 @@ def get_container_info(container_id: int, db: Session = Depends(get_db)):
         sg_measurements = sg_rows
 
         if len(sg_rows) >= 2:
-            sgs = [m.specific_gravity for m in sg_rows]
-            initial_sg = max(sgs)
-            final_sg = min(sgs)
+            initial_sg = sg_rows[0].specific_gravity
+            final_sg = sg_rows[-1].specific_gravity
             abv = sg_diff_to_abv(initial_sg - final_sg)
             residual_sugar = sg_to_sugar(final_sg)
 

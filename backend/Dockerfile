@@ -1,12 +1,16 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.11-slim-bookworm AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
-COPY . /app
 WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
-RUN uv sync --frozen
+COPY . .
 
-CMD ["sh", "-c", "uv run uvicorn alcopt.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+FROM python:3.11-slim-bookworm
+
+WORKDIR /app
+COPY --from=builder /app /app
+
+CMD ["sh", "-c", "/app/.venv/bin/uvicorn alcopt.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

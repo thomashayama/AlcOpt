@@ -23,72 +23,71 @@ A fermentation tracking and optimization web app. Log brews, track ingredients, 
 - **Leaderboard & Analytics** - Rank fermentations by average rating, view correlation heatmaps and rating distributions
 - **ABV & Sugar Calculations** - Predict potential ABV and residual sugar from ingredients and gravity readings
 - **Vessel & Bottle Management** - Track carboys, demijohns, and individual bottles through the fermentation lifecycle
+- **Label Generation** - Print QR-code label sheets with Truchet-tile designs for containers
 - **Google OAuth** - Authentication with role-based admin access
 
 ## Tech Stack
 
-- **Streamlit** - Web UI
-- **SQLAlchemy** + **SQLite** (or PostgreSQL) - Data layer
-- **Matplotlib** / **Seaborn** / **Altair** - Visualization
-- **Docker** - Containerized deployment
-- **Google OAuth2** - Authentication
+- **Backend**: FastAPI, SQLAlchemy, Python 3.11, managed by [uv](https://docs.astral.sh/uv/)
+- **Frontend**: Next.js (App Router), React, TypeScript, Tailwind CSS, shadcn/ui, Recharts
+- **Database**: SQLite locally, PostgreSQL in production
+- **Auth**: Google OAuth2 redirect flow with JWT in httpOnly cookies
+- **Infrastructure**: Docker, Railway
 
 ## Run
 
 ```bash
-docker compose up -d app
+# Docker
+docker compose up -d backend frontend
+
+# Or run services individually:
+
+# Backend
+cd backend && uv run uvicorn alcopt.api.main:app --reload --port 8000
+
+# Frontend
+cd frontend && npm run dev
 ```
 
-### Development
+## Development
 
 ```bash
-# Windows
-choco install make
-make local
+# Install backend dependencies
+cd backend && uv sync
 
-# Or directly
-pip install -e .
-streamlit run alcopt/app/main.py
-```
+# Install frontend dependencies
+cd frontend && npm install
 
-## Install
+# Lint & format
+cd backend && uv run ruff check alcopt/ && uv run ruff format alcopt/
+cd frontend && npm run lint
 
-### Option 1
-```bash
-pip install -e .
-```
-
-### Option 2
-```bash
-python -m pip install -r requirements.txt
+# Run tests
+cd backend && uv run pytest
 ```
 
 ## Configuration
 
 Copy `.env.example` to `.env` and fill in:
-- `DATABASE_URL` — database connection URI
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth2 credentials
-- `GOOGLE_REDIRECT_URI` — OAuth redirect URL
-- `ADMIN_EMAILS` — comma-separated list of admin emails
+- `DATABASE_URL` - database connection URI (defaults to SQLite)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth2 credentials
+- `GOOGLE_REDIRECT_URI` - OAuth redirect URL
+- `JWT_SECRET` - secret key for JWT signing
+- `FRONTEND_URL` - frontend origin for CORS and redirects
+- `ADMIN_EMAILS` - comma-separated list of admin emails
 
 ## Deployment (Railway)
 
 This repo is designed to be used as a **git submodule** in a deploy monorepo. On Railway:
 
 1. Add this repo as a submodule in your deploy repo
-2. Create a service in your Railway project and set the **Root Directory** to the submodule path
-3. Add a **Postgres** service — Railway provides `DATABASE_URL` automatically
-4. Set environment variables (or use Railway's env var UI):
-   - `DATABASE_URL` — provided by Railway Postgres (auto-linked)
-   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth credentials
-   - `GOOGLE_REDIRECT_URI` — OAuth redirect URL
-   - `ADMIN_EMAILS` — comma-separated admin emails
-   - `PORT` — set automatically by Railway
-
-## Database
-
-SQLite locally, PostgreSQL in production. The app auto-detects which to use based on the connection URI.
-
-Using DBeaver (https://dbeaver.io) for SQL visualizations
-
-![alt text](docs/table_viz.png "Schema Visualization")
+2. Create backend and frontend services, each pointing to their subdirectory
+3. Add a **Postgres** service - Railway provides `DATABASE_URL` automatically
+4. Set environment variables:
+   - `DATABASE_URL` - provided by Railway Postgres (auto-linked)
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - OAuth credentials
+   - `GOOGLE_REDIRECT_URI` - OAuth redirect URL
+   - `JWT_SECRET` - secret for JWT signing
+   - `FRONTEND_URL` - e.g. `https://alcopt.thomashayama.com`
+   - `ADMIN_EMAILS` - comma-separated admin emails
+   - `PORT` - set automatically by Railway
