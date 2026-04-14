@@ -6,6 +6,7 @@ from alcopt.api.schemas import (
     ContainerCreate,
     ContainerInfoResponse,
     ContainerOut,
+    ContainerUpdate,
     ReviewOut,
     SgMeasurementOut,
 )
@@ -49,6 +50,26 @@ def list_containers(
     if container_type:
         q = q.filter(Container.container_type == container_type)
     return q.offset(offset).limit(limit).all()
+
+
+@router.put("/{container_id}", response_model=ContainerOut)
+def update_container(
+    container_id: int,
+    body: ContainerUpdate,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    container = db.get(Container, container_id)
+    if not container:
+        raise HTTPException(404, f"Container {container_id} not found")
+
+    updates = body.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(container, field, value)
+
+    db.commit()
+    db.refresh(container)
+    return container
 
 
 @router.get("/{container_id}", response_model=ContainerInfoResponse)

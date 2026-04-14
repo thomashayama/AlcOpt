@@ -71,6 +71,7 @@ def create_jwt(email: str, picture: str = "", name: str = "") -> str:
         "sub": email,
         "picture": picture,
         "name": name,
+        "jti": secrets.token_urlsafe(16),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS),
     }

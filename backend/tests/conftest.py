@@ -4,7 +4,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from alcopt.api.dependencies import get_db, get_current_user, get_optional_user, require_admin
+from alcopt.api.dependencies import (
+    get_db,
+    get_current_user,
+    get_optional_user,
+    require_admin,
+)
 from alcopt.api.main import app
 from alcopt.database.models import Base
 

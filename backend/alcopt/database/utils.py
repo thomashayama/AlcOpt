@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
@@ -21,6 +20,30 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     Base.metadata.create_all(bind=engine)
     _add_missing_columns()
+    _ensure_open_log_unique_index()
+
+
+def _ensure_open_log_unique_index():
+    """Ensure the partial unique index on open container logs exists.
+
+    create_all() won't add an index to a table that already exists on older
+    databases, so we issue the DDL directly. The syntax is identical between
+    SQLite 3.8+ and Postgres.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "container_fermentation_logs" not in inspector.get_table_names():
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ix_container_fermentation_logs_one_open_per_container "
+                "ON container_fermentation_logs (container_id) "
+                "WHERE end_date IS NULL"
+            )
+        )
 
 
 def _add_missing_columns():
@@ -62,15 +85,6 @@ def _add_missing_columns():
                         "ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
                     )
                 )
-
-
-@contextmanager
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def close_open_log(

@@ -13,6 +13,7 @@ from alcopt.api.routers import auth, home, reviews, brew, containers, labels
 async def lifespan(app: FastAPI):
     validate_config()
     init_db()
+    auth.cleanup_auth_tables()
     yield
 
 

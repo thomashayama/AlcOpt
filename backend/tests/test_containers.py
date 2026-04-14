@@ -112,6 +112,33 @@ def test_create_container_requires_admin(user_client):
     assert resp.status_code == 403
 
 
+def test_update_container(admin_client):
+    db = TestSession()
+    db.add(Container(id=1, container_type="carboy", volume_liters=5.0))
+    db.commit()
+    db.close()
+
+    resp = admin_client.put(
+        "/api/containers/1",
+        json={"notes": "moved to basement", "volume_liters": 4.5},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["notes"] == "moved to basement"
+    assert data["volume_liters"] == 4.5
+    assert data["container_type"] == "carboy"  # unchanged
+
+
+def test_update_container_not_found(admin_client):
+    resp = admin_client.put("/api/containers/999", json={"notes": "x"})
+    assert resp.status_code == 404
+
+
+def test_update_container_requires_admin(user_client):
+    resp = user_client.put("/api/containers/1", json={"notes": "x"})
+    assert resp.status_code == 403
+
+
 def test_list_containers(admin_client):
     db = TestSession()
     db.add(Container(container_type="carboy"))

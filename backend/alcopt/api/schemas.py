@@ -108,6 +108,7 @@ class SgMeasurementOut(BaseModel):
 class SgMeasurementCreate(BaseModel):
     container_id: int
     measurement_date: date
+    measurement_datetime: datetime | None = None
     specific_gravity: float = Field(ge=0.8, le=1.2)
 
 
@@ -123,6 +124,7 @@ class MassMeasurementOut(BaseModel):
 class MassMeasurementCreate(BaseModel):
     container_id: int
     measurement_date: date
+    measurement_datetime: datetime | None = None
     mass: float = Field(gt=0)
 
 
@@ -142,10 +144,19 @@ class IngredientAdditionOut(BaseModel):
 VALID_UNITS = {"kg", "g", "L", "mL", "tsp", "tbsp"}
 
 
+def _validate_unit(v: str) -> str:
+    if v not in VALID_UNITS:
+        raise ValueError(
+            f"Invalid unit '{v}'. Must be one of: {', '.join(sorted(VALID_UNITS))}"
+        )
+    return v
+
+
 class IngredientAdditionCreate(BaseModel):
     container_id: int
     ingredient_name: str
     date: date
+    added_at: datetime | None = None
     starting_amount: float = 0.0
     ending_amount: float = 0.0
     unit: str = "g"
@@ -153,16 +164,13 @@ class IngredientAdditionCreate(BaseModel):
     @field_validator("unit")
     @classmethod
     def validate_unit(cls, v: str) -> str:
-        if v not in VALID_UNITS:
-            raise ValueError(
-                f"Invalid unit '{v}'. Must be one of: {', '.join(sorted(VALID_UNITS))}"
-            )
-        return v
+        return _validate_unit(v)
 
 
 class StartFermentationRequest(BaseModel):
     container_id: int
     start_date: date
+    start_datetime: datetime | None = None
     stage: str = "primary"
 
 
@@ -170,6 +178,7 @@ class RackRequest(BaseModel):
     from_container_id: int
     to_container_id: int
     date: date
+    at: datetime | None = None
     stage: str = "secondary"
 
 
@@ -177,8 +186,38 @@ class BottleRequest(BaseModel):
     from_container_id: int
     to_container_id: int
     date: date
+    at: datetime | None = None
     amount: float = 0.0
     unit: str = "g"
+
+    @field_validator("unit")
+    @classmethod
+    def validate_unit(cls, v: str) -> str:
+        return _validate_unit(v)
+
+
+class FermentationEndRequest(BaseModel):
+    end_datetime: datetime | None = None
+    end_date: date | None = None
+    end_mass: float | None = None
+
+
+class FermentationActiveOut(BaseModel):
+    fermentation_id: int
+    start_date: datetime
+    container_id: int
+    container_type: str
+    stage: str | None = None
+    log_start_date: datetime
+
+
+class ContainerUpdate(BaseModel):
+    container_type: str | None = None
+    volume_liters: float | None = None
+    material: str | None = None
+    empty_mass: float | None = None
+    date_added: date | None = None
+    notes: str | None = None
 
 
 class LeaderboardEntry(BaseModel):

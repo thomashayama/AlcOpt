@@ -15,7 +15,7 @@ from alcopt.auth import (
 from alcopt.api.dependencies import get_current_user, get_db
 from alcopt.api.schemas import UserInfo
 from alcopt.config import FRONTEND_URL
-from alcopt.database.models import OAuthState
+from alcopt.database.models import OAuthState, RevokedToken
 
 _SECURE_COOKIE = FRONTEND_URL.startswith("https")
 
@@ -27,6 +27,23 @@ _STATE_TTL = timedelta(minutes=10)
 def _cleanup_expired(db: Session):
     cutoff = datetime.now() - _STATE_TTL
     db.query(OAuthState).filter(OAuthState.created_at < cutoff).delete()
+
+
+def _cleanup_revoked(db: Session):
+    db.query(RevokedToken).filter(RevokedToken.expires_at < datetime.now()).delete()
+
+
+def cleanup_auth_tables():
+    """Run on startup to bound growth of short-lived auth state."""
+    from alcopt.database.utils import SessionLocal
+
+    db = SessionLocal()
+    try:
+        _cleanup_expired(db)
+        _cleanup_revoked(db)
+        db.commit()
+    finally:
+        db.close()
 
 
 @router.get("/login")
@@ -79,7 +96,19 @@ def me(user: dict = Depends(get_current_user)):
 
 
 @router.post("/logout")
-def logout():
+def logout(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    jti = user.get("jti")
+    exp = user.get("exp")
+    if jti and exp:
+        expires_at = (
+            datetime.fromtimestamp(exp) if isinstance(exp, (int, float)) else exp
+        )
+        if not db.get(RevokedToken, jti):
+            db.add(RevokedToken(jti=jti, expires_at=expires_at))
+            db.commit()
     response = Response(status_code=200)
     response.delete_cookie("token")
     return response

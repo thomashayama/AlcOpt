@@ -503,3 +503,137 @@ def test_full_fermentation_lifecycle(admin_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["fermentation_id"] == 1  # same fermentation through the chain
+
+
+# --- Validation ---
+
+
+def test_bottle_invalid_unit(admin_client):
+    _seed_container_with_fermentation()
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "amount": 750.0,
+            "unit": "gallons",
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_rack_same_container(admin_client):
+    _seed_container_with_fermentation()
+    resp = admin_client.post(
+        "/api/brew/rack",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 1,
+            "date": "2025-02-01",
+        },
+    )
+    assert resp.status_code == 400
+
+
+def test_explicit_datetime_ordering(admin_client):
+    """Two SG measurements on the same calendar day with explicit datetimes
+    should both land in the active fermentation without ordering collisions."""
+    _seed_container_with_fermentation()
+    resp1 = admin_client.post(
+        "/api/brew/sg-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "measurement_datetime": "2025-01-15T09:00:00",
+            "specific_gravity": 1.090,
+        },
+    )
+    resp2 = admin_client.post(
+        "/api/brew/sg-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "measurement_datetime": "2025-01-15T17:00:00",
+            "specific_gravity": 1.050,
+        },
+    )
+    assert resp1.status_code == 200
+    assert resp2.status_code == 200
+
+
+# --- End fermentation ---
+
+
+def test_end_fermentation(admin_client):
+    _seed_container_with_fermentation()
+    resp = admin_client.patch(
+        "/api/brew/fermentations/1",
+        json={"end_date": "2025-06-01", "end_mass": 4900.0},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["end_date"] is not None
+    assert data["end_mass"] == 4900.0
+
+    db = TestSession()
+    log = db.query(ContainerFermentationLog).filter_by(container_id=1).first()
+    assert log.end_date is not None
+    db.close()
+
+
+def test_end_fermentation_not_found(admin_client):
+    resp = admin_client.patch("/api/brew/fermentations/999", json={})
+    assert resp.status_code == 404
+
+
+# --- Active fermentations ---
+
+
+def test_active_fermentations_empty(admin_client):
+    resp = admin_client.get("/api/brew/fermentations/active")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_active_fermentations_lists_open(admin_client):
+    _seed_container_with_fermentation()
+    resp = admin_client.get("/api/brew/fermentations/active")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["fermentation_id"] == 1
+    assert data[0]["container_id"] == 1
+
+
+def test_active_fermentations_excludes_ended(admin_client):
+    _seed_container_with_fermentation()
+    admin_client.patch("/api/brew/fermentations/1", json={"end_date": "2025-06-01"})
+    resp = admin_client.get("/api/brew/fermentations/active")
+    assert resp.json() == []
+
+
+# --- Open-log uniqueness (race guard) ---
+
+
+def test_open_log_uniqueness_enforced(admin_client, db):
+    """The partial unique index must prevent two open logs on the same container."""
+    from sqlalchemy.exc import IntegrityError
+
+    _seed_container_with_fermentation()
+    db.add(Fermentation(id=2, start_date=date(2025, 2, 1)))
+    db.flush()
+    db.add(
+        ContainerFermentationLog(
+            container_id=1,
+            fermentation_id=2,
+            start_date=datetime(2025, 2, 1),
+        )
+    )
+    try:
+        db.commit()
+        committed = True
+    except IntegrityError:
+        db.rollback()
+        committed = False
+    assert committed is False

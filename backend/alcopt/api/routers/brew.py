@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from alcopt.api.dependencies import get_db, require_admin
@@ -8,6 +10,9 @@ from alcopt.api.schemas import (
     AbvCalcRequest,
     ContainerLogOut,
     EmptyContainerResponse,
+    FermentationActiveOut,
+    FermentationEndRequest,
+    FermentationOut,
     IngredientAdditionCreate,
     IngredientAdditionResponse,
     IngredientCreate,
@@ -53,6 +58,21 @@ def _get_container(db: Session, container_id: int) -> Container:
     return container
 
 
+def _resolve_dt(explicit: Optional[datetime], fallback_date: date) -> datetime:
+    """Use the explicit datetime if provided, else combine the date with now()."""
+    if explicit is not None:
+        return explicit
+    return datetime.combine(fallback_date, datetime.now().time())
+
+
+def _commit_or_conflict(db: Session, message: str = "Concurrent update on container"):
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, message)
+
+
 @router.post("/fermentations", response_model=ContainerLogOut)
 def start_fermentation(
     body: StartFermentationRequest,
@@ -60,7 +80,9 @@ def start_fermentation(
     _admin: dict = Depends(require_admin),
 ):
     _get_container(db, body.container_id)
-    start_dt = datetime.combine(body.start_date, datetime.min.time())
+    start_dt = body.start_datetime or datetime.combine(
+        body.start_date, datetime.min.time()
+    )
     fermentation = Fermentation(start_date=start_dt)
     db.add(fermentation)
     db.flush()
@@ -73,7 +95,7 @@ def start_fermentation(
         stage=body.stage,
     )
     db.add(log)
-    db.commit()
+    _commit_or_conflict(db)
     db.refresh(log)
     return log
 
@@ -84,6 +106,73 @@ def list_fermentation_logs(
     _admin: dict = Depends(require_admin),
 ):
     return all_container_log_info(db)
+
+
+@router.get("/fermentations/active", response_model=list[FermentationActiveOut])
+def list_active_fermentations(
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    rows = (
+        db.query(ContainerFermentationLog, Container, Fermentation)
+        .join(Container, Container.id == ContainerFermentationLog.container_id)
+        .join(Fermentation, Fermentation.id == ContainerFermentationLog.fermentation_id)
+        .filter(
+            ContainerFermentationLog.end_date.is_(None),
+            Fermentation.end_date.is_(None),
+        )
+        .order_by(Fermentation.start_date.desc())
+        .all()
+    )
+    return [
+        FermentationActiveOut(
+            fermentation_id=f.id,
+            start_date=f.start_date,
+            container_id=c.id,
+            container_type=c.container_type,
+            stage=log.stage,
+            log_start_date=log.start_date,
+        )
+        for log, c, f in rows
+    ]
+
+
+@router.patch("/fermentations/{fermentation_id}", response_model=FermentationOut)
+def end_fermentation(
+    fermentation_id: int,
+    body: FermentationEndRequest,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    fermentation = db.get(Fermentation, fermentation_id)
+    if not fermentation:
+        raise HTTPException(404, f"Fermentation {fermentation_id} not found")
+
+    if body.end_datetime is not None:
+        end_dt = body.end_datetime
+    elif body.end_date is not None:
+        end_dt = datetime.combine(body.end_date, datetime.now().time())
+    else:
+        end_dt = datetime.now()
+
+    fermentation.end_date = end_dt
+    if body.end_mass is not None:
+        fermentation.end_mass = body.end_mass
+
+    open_logs = (
+        db.query(ContainerFermentationLog)
+        .filter(
+            ContainerFermentationLog.fermentation_id == fermentation_id,
+            ContainerFermentationLog.end_date.is_(None),
+        )
+        .all()
+    )
+    for log in open_logs:
+        log.end_date = end_dt
+
+    db.commit()
+    db.refresh(fermentation)
+    return fermentation
 
 
 @router.post("/ingredients", response_model=IngredientOut)
@@ -128,7 +217,7 @@ def add_ingredient_addition(
         raise HTTPException(404, f"Ingredient '{body.ingredient_name}' not found")
 
     amount = body.ending_amount - body.starting_amount
-    added_at = datetime.combine(body.date, datetime.now().time())
+    added_at = _resolve_dt(body.added_at, body.date)
 
     addition = IngredientAddition(
         container_id=body.container_id,
@@ -164,7 +253,7 @@ def add_sg_measurement(
     _admin: dict = Depends(require_admin),
 ):
     _get_container(db, body.container_id)
-    measurement_dt = datetime.combine(body.measurement_date, datetime.now().time())
+    measurement_dt = _resolve_dt(body.measurement_datetime, body.measurement_date)
     log = current_fermentation_log(db, body.container_id, measurement_dt)
     if not log:
         raise HTTPException(400, "No active fermentation for this container")
@@ -195,7 +284,7 @@ def add_mass_measurement(
     _admin: dict = Depends(require_admin),
 ):
     _get_container(db, body.container_id)
-    measurement_dt = datetime.combine(body.measurement_date, datetime.now().time())
+    measurement_dt = _resolve_dt(body.measurement_datetime, body.measurement_date)
     log = current_fermentation_log(db, body.container_id, measurement_dt)
     if not log:
         raise HTTPException(400, "No active fermentation for this container")
@@ -225,10 +314,12 @@ def rack(
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
+    if body.from_container_id == body.to_container_id:
+        raise HTTPException(400, "Source and destination must differ")
     _get_container(db, body.from_container_id)
     _get_container(db, body.to_container_id)
 
-    rack_dt = datetime.combine(body.date, datetime.now().time())
+    rack_dt = _resolve_dt(body.at, body.date)
     source_log = current_fermentation_log(db, body.from_container_id, rack_dt)
     if not source_log:
         raise HTTPException(400, "No active fermentation on source container")
@@ -236,6 +327,7 @@ def rack(
     close_open_log(db, body.from_container_id, rack_dt)
     db.flush()
     close_open_log(db, body.to_container_id, rack_dt)
+    db.flush()
 
     log = ContainerFermentationLog(
         container_id=body.to_container_id,
@@ -245,7 +337,7 @@ def rack(
         stage=body.stage,
     )
     db.add(log)
-    db.commit()
+    _commit_or_conflict(db, "Another rack/bottle/start happened for this container")
     db.refresh(log)
     return log
 
@@ -256,15 +348,18 @@ def bottle(
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
+    if body.from_container_id == body.to_container_id:
+        raise HTTPException(400, "Source and destination must differ")
     _get_container(db, body.from_container_id)
     _get_container(db, body.to_container_id)
 
-    bottle_dt = datetime.combine(body.date, datetime.now().time())
+    bottle_dt = _resolve_dt(body.at, body.date)
     source_log = current_fermentation_log(db, body.from_container_id, bottle_dt)
     if not source_log:
         raise HTTPException(400, "No active fermentation on source container")
 
     close_open_log(db, body.to_container_id, bottle_dt)
+    db.flush()
 
     log = ContainerFermentationLog(
         container_id=body.to_container_id,
@@ -276,7 +371,7 @@ def bottle(
         stage="bottled",
     )
     db.add(log)
-    db.commit()
+    _commit_or_conflict(db, "Another rack/bottle/start happened for this container")
     db.refresh(log)
     return log
 

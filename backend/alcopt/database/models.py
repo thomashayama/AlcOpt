@@ -1,6 +1,7 @@
 from sqlalchemy import (
     create_engine,
     Column,
+    Index,
     Integer,
     String,
     Date,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     REAL,
     ForeignKey,
     CheckConstraint,
+    text,
 )
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
@@ -108,6 +110,16 @@ class ContainerFermentationLog(TimestampMixin, Base):
     source_container = relationship("Container", foreign_keys=[source_container_id])
     fermentation = relationship("Fermentation", back_populates="container_logs")
 
+    __table_args__ = (
+        Index(
+            "ix_container_fermentation_logs_one_open_per_container",
+            "container_id",
+            unique=True,
+            sqlite_where=text("end_date IS NULL"),
+            postgresql_where=text("end_date IS NULL"),
+        ),
+    )
+
 
 class IngredientAddition(TimestampMixin, Base):
     """An ingredient added to (or removed from) a container at a specific time.
@@ -188,6 +200,19 @@ class OAuthState(Base):
     __tablename__ = "oauth_states"
     state = Column(String, primary_key=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class RevokedToken(Base):
+    """JWT ids (jti) revoked before natural expiry (e.g. via /auth/logout).
+
+    Rows whose `expires_at` is in the past can be safely deleted — once the
+    original token would expire anyway, the blacklist entry is redundant.
+    """
+
+    __tablename__ = "revoked_tokens"
+    jti = Column(String, primary_key=True)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=False, default=datetime.now)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,8 @@
+from datetime import datetime, timedelta
+
 from alcopt.auth import create_jwt, decode_jwt, is_admin
+from alcopt.database.models import RevokedToken
+from tests.conftest import TestSession
 
 
 def test_create_and_decode_jwt():
@@ -41,6 +45,38 @@ def test_me_authenticated(user_client):
     assert data["email"] == "user@test.com"
 
 
-def test_logout(client):
-    resp = client.post("/auth/logout")
+def test_logout(user_client):
+    resp = user_client.post("/auth/logout")
     assert resp.status_code == 200
+
+
+def test_logout_unauthenticated(client):
+    resp = client.post("/auth/logout")
+    assert resp.status_code == 401
+
+
+def test_jwt_contains_jti():
+    token = create_jwt("test@example.com")
+    payload = decode_jwt(token)
+    assert payload is not None
+    assert "jti" in payload
+    assert len(payload["jti"]) > 0
+
+
+def test_revoked_jti_rejects_requests(client):
+    """A JWT whose jti is in RevokedToken should be treated as unauthenticated."""
+    token = create_jwt("user@test.com")
+    payload = decode_jwt(token)
+
+    db = TestSession()
+    db.add(
+        RevokedToken(
+            jti=payload["jti"],
+            expires_at=datetime.now() + timedelta(hours=1),
+        )
+    )
+    db.commit()
+    db.close()
+
+    resp = client.get("/auth/me", cookies={"token": token})
+    assert resp.status_code == 401
