@@ -22,7 +22,7 @@ vi.mock('../src/lib/api', () => ({
 const mockedApi = vi.mocked(api);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 afterEach(() => {
@@ -58,6 +58,12 @@ test('start and rack confirmations include fermentation and log ids', async () =
   startView.unmount();
 
   render(<RackTab />);
+  fireEvent.change(screen.getByLabelText('From Container ID'), {
+    target: { value: '1' },
+  });
+  fireEvent.change(screen.getByLabelText('To Container ID'), {
+    target: { value: '2' },
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Record Racking' }));
 
   expect(await screen.findByText('Rack recorded: fermentation 9 moved from container 1 to 2 (log 22).')).toBeDefined();
@@ -82,6 +88,9 @@ test('sg and mass measurements show ids and can undo the last current-session re
     .mockResolvedValueOnce({ message: 'Mass measurement 20 undone' });
 
   const sgView = render(<SgTab />);
+  fireEvent.change(screen.getByLabelText('Container ID'), {
+    target: { value: '1' },
+  });
   fireEvent.change(screen.getByLabelText('Specific Gravity'), {
     target: { value: '1.045' },
   });
@@ -97,6 +106,9 @@ test('sg and mass measurements show ids and can undo the last current-session re
   sgView.unmount();
 
   render(<MassTab />);
+  fireEvent.change(screen.getByLabelText('Container ID'), {
+    target: { value: '1' },
+  });
   fireEvent.change(screen.getByLabelText('Mass (g)'), {
     target: { value: '5200' },
   });
@@ -194,4 +206,131 @@ test('ingredient creation selects it, addition previews amount, table renders AP
     expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/additions/34/undo');
   });
   expect(await screen.findByText('Ingredient addition 34 undone')).toBeDefined();
+});
+
+test('active fermentations guide start, sg, mass, and rack container choices', async () => {
+  const active = [
+    {
+      fermentation_id: 9,
+      start_date: '2026-05-01T00:00:00',
+      container_id: 4,
+      container_type: 'carboy',
+      stage: 'primary',
+      log_start_date: '2026-05-01T00:00:00',
+    },
+  ];
+  mockedApi.get.mockImplementation(async (path: string) => {
+    if (path === '/api/brew/fermentations/active') return active;
+    return [];
+  });
+  mockedApi.post
+    .mockResolvedValueOnce({
+      id: 10,
+      fermentation_id: 9,
+      measurement_date: '2026-05-28',
+      specific_gravity: 1.045,
+    })
+    .mockResolvedValueOnce({
+      id: 20,
+      fermentation_id: 9,
+      measurement_date: '2026-05-28',
+      mass: 5200,
+    })
+    .mockResolvedValueOnce({
+      id: 22,
+      container_id: 6,
+      fermentation_id: 9,
+      source_container_id: 4,
+      start_date: '2026-05-29T00:00:00',
+      stage: 'secondary',
+    });
+
+  const startView = render(<StartTab />);
+  expect(
+    await screen.findByText('Active: container 4, fermentation 9, primary, started 2026-05-01'),
+  ).toBeDefined();
+  expect((screen.getByLabelText('Container ID') as HTMLInputElement).value).toBe('');
+  startView.unmount();
+
+  const sgView = render(<SgTab />);
+  expect(
+    await screen.findByText('Container 4 - fermentation 9 - primary - carboy - started 2026-05-01'),
+  ).toBeDefined();
+  fireEvent.change(screen.getByLabelText('Specific Gravity'), {
+    target: { value: '1.045' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Record Measurement' }));
+
+  await waitFor(() => {
+    expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/sg-measurements', expect.objectContaining({
+      container_id: 4,
+    }));
+  });
+  sgView.unmount();
+
+  const massView = render(<MassTab />);
+  await screen.findByText('Container 4 - fermentation 9 - primary - carboy - started 2026-05-01');
+  fireEvent.change(screen.getByLabelText('Mass (g)'), {
+    target: { value: '5200' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Record Measurement' }));
+
+  await waitFor(() => {
+    expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/mass-measurements', expect.objectContaining({
+      container_id: 4,
+    }));
+  });
+  massView.unmount();
+
+  render(<RackTab />);
+  await screen.findByText('Container 4 - fermentation 9 - primary - carboy - started 2026-05-01');
+  fireEvent.change(screen.getByLabelText('To Container ID'), {
+    target: { value: '6' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Record Racking' }));
+
+  await waitFor(() => {
+    expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/rack', expect.objectContaining({
+      from_container_id: 4,
+      to_container_id: 6,
+    }));
+  });
+});
+
+test('ingredient additions use a unit dropdown with valid backend units', async () => {
+  mockedApi.get.mockImplementation(async (path: string) => {
+    if (path === '/api/brew/ingredients') {
+      return [{ id: 1, name: 'Juice', sugar_content: 200, ingredient_type: 'Liquid' }];
+    }
+    if (path === '/api/brew/additions') return [];
+    return [];
+  });
+  mockedApi.post.mockResolvedValue({
+    id: 34,
+    fermentation_id: 2,
+    message: 'Ingredient added',
+  });
+
+  render(<IngredientsTab />);
+
+  await screen.findByText('Juice');
+  fireEvent.change(screen.getByLabelText('Ingredient'), {
+    target: { value: 'Juice' },
+  });
+  fireEvent.change(screen.getByLabelText('Starting Amount'), {
+    target: { value: '0' },
+  });
+  fireEvent.change(screen.getByLabelText('Ending Amount'), {
+    target: { value: '500' },
+  });
+  fireEvent.change(screen.getByLabelText('Unit'), {
+    target: { value: 'mL' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add to Container' }));
+
+  await waitFor(() => {
+    expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/additions', expect.objectContaining({
+      unit: 'mL',
+    }));
+  });
 });

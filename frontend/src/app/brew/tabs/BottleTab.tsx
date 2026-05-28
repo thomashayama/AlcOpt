@@ -11,6 +11,11 @@ import { Label } from '@/components/ui/label';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
+import {
+  ActiveFermentationSelect,
+  UnitSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 type AmountMode = 'contents' | 'filledMass';
 
@@ -21,8 +26,8 @@ function formatGram(value: number) {
 }
 
 export function BottleTab() {
-  const [fromContainerId, setFromContainerId] = useState(1);
-  const [toContainerId, setToContainerId] = useState(1);
+  const [fromContainerId, setFromContainerId] = useState<ContainerIdValue>('');
+  const [toContainerId, setToContainerId] = useState<ContainerIdValue>('');
   const [bottleDate, setBottleDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -59,12 +64,17 @@ export function BottleTab() {
       setTargetBottleMessage(null);
       return;
     }
+    if (toContainerId === '') {
+      setTargetBottleEmptyMass(null);
+      setTargetBottleMessage(null);
+      return;
+    }
 
     let cancelled = false;
     setTargetBottleEmptyMass(null);
     setTargetBottleMessage({ type: 'success', text: 'Loading bottle mass...' });
 
-    api.get<ContainerInfoResponse>(`/api/containers/${toContainerId}`)
+    api.get<ContainerInfoResponse>(`/api/containers/${Number(toContainerId)}`)
       .then((data) => {
         if (cancelled) return;
         const emptyMass = data.container.empty_mass;
@@ -101,7 +111,8 @@ export function BottleTab() {
       ? filledMass - targetBottleEmptyMass
       : null;
 
-  const canSubmit = !submitting && (
+  const hasContainers = fromContainerId !== '' && toContainerId !== '';
+  const canSubmit = !submitting && hasContainers && (
     amountMode === 'contents'
     || (
       filledMass !== ''
@@ -118,14 +129,14 @@ export function BottleTab() {
     try {
       const payload = amountMode === 'filledMass'
         ? {
-          from_container_id: fromContainerId,
-          to_container_id: toContainerId,
+          from_container_id: Number(fromContainerId),
+          to_container_id: Number(toContainerId),
           date: bottleDate,
           filled_mass_g: filledMass === '' ? null : filledMass,
         }
         : {
-          from_container_id: fromContainerId,
-          to_container_id: toContainerId,
+          from_container_id: Number(fromContainerId),
+          to_container_id: Number(toContainerId),
           date: bottleDate,
           amount: amount === '' ? null : amount,
           unit,
@@ -146,10 +157,14 @@ export function BottleTab() {
       }
 
       const log = await api.post<ContainerLogOut>('/api/brew/bottle', payload);
+      const nextBottleId = Number(toContainerId) + 1;
       setLastBottlingLog(log);
+      setToContainerId(nextBottleId);
+      setAmount('');
+      setFilledMass('');
       setMessage({
         type: 'success',
-        text: `Bottling recorded for container ${log.container_id}.`,
+        text: `Bottling recorded for container ${log.container_id}. Next bottle should be ${nextBottleId}.`,
       });
     } catch (err) {
       setMessage({
@@ -200,6 +215,11 @@ export function BottleTab() {
         <CardHeader><CardTitle>Bottle</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <ActiveFermentationSelect
+              id="bottle_active_fermentation"
+              value={fromContainerId}
+              onChange={setFromContainerId}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="bot_from">From Container ID (vessel)</Label>
@@ -208,7 +228,7 @@ export function BottleTab() {
                   type="number"
                   min={1}
                   value={fromContainerId}
-                  onChange={(e) => setFromContainerId(Number(e.target.value))}
+                  onChange={(e) => setFromContainerId(e.target.value === '' ? '' : Number(e.target.value))}
                   required
                 />
               </div>
@@ -219,7 +239,7 @@ export function BottleTab() {
                   type="number"
                   min={1}
                   value={toContainerId}
-                  onChange={(e) => setToContainerId(Number(e.target.value))}
+                  onChange={(e) => setToContainerId(e.target.value === '' ? '' : Number(e.target.value))}
                   required
                 />
               </div>
@@ -282,15 +302,12 @@ export function BottleTab() {
                       )}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bot_unit">Unit</Label>
-                    <Input
-                      id="bot_unit"
-                      type="text"
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
-                    />
-                  </div>
+                  <UnitSelect
+                    id="bot_unit"
+                    label="Unit"
+                    value={unit}
+                    onChange={setUnit}
+                  />
                 </>
               ) : (
                 <div className="space-y-2 md:col-span-2">
@@ -327,6 +344,11 @@ export function BottleTab() {
             )}
 
             <Message message={message} />
+            {lastBottlingLog && toContainerId !== '' && (
+              <p className="text-sm text-muted-foreground">
+                {`Next bottle should be ${toContainerId}`}
+              </p>
+            )}
             <div className="flex flex-wrap gap-3">
               <Button type="submit" disabled={!canSubmit}>
                 {submitting ? 'Recording...' : 'Record Bottling'}

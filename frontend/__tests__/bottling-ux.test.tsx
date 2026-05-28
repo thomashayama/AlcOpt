@@ -19,7 +19,7 @@ vi.mock('../src/lib/api', () => ({
 const mockedApi = vi.mocked(api);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 afterEach(() => {
@@ -84,6 +84,9 @@ test('bottling can submit filled bottle mass instead of manual contents amount',
 
   render(<BrewBottleTab />);
 
+  fireEvent.change(screen.getByLabelText('From Container ID (vessel)'), {
+    target: { value: '1' },
+  });
   fireEvent.change(screen.getByLabelText('To Container ID (bottle)'), {
     target: { value: '3' },
   });
@@ -109,6 +112,7 @@ test('bottling can submit filled bottle mass instead of manual contents amount',
 });
 
 test('bottling exposes undo for the last bottling action in the current session', async () => {
+  mockedApi.get.mockResolvedValue([]);
   mockedApi.post
     .mockResolvedValueOnce({
       id: 77,
@@ -123,6 +127,9 @@ test('bottling exposes undo for the last bottling action in the current session'
 
   render(<BrewBottleTab />);
 
+  fireEvent.change(screen.getByLabelText('From Container ID (vessel)'), {
+    target: { value: '1' },
+  });
   fireEvent.change(screen.getByLabelText('To Container ID (bottle)'), {
     target: { value: '3' },
   });
@@ -139,4 +146,60 @@ test('bottling exposes undo for the last bottling action in the current session'
     expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/bottle/77/undo');
   });
   expect(await screen.findByText('Bottling log 77 undone')).toBeDefined();
+});
+
+test('bottling uses active fermentation source, unit dropdown, and advances to next bottle', async () => {
+  mockedApi.get.mockImplementation(async (path: string) => {
+    if (path === '/api/brew/fermentations/active') {
+      return [
+        {
+          fermentation_id: 9,
+          start_date: '2026-05-01T00:00:00',
+          container_id: 4,
+          container_type: 'carboy',
+          stage: 'primary',
+          log_start_date: '2026-05-01T00:00:00',
+        },
+      ];
+    }
+    return [];
+  });
+  mockedApi.post.mockResolvedValue({
+    id: 77,
+    container_id: 3,
+    fermentation_id: 9,
+    start_date: '2026-05-28T12:00:00',
+    amount: 750,
+    unit: 'mL',
+    stage: 'bottled',
+  });
+
+  render(<BrewBottleTab />);
+
+  expect(
+    await screen.findByText('Container 4 - fermentation 9 - primary - carboy - started 2026-05-01'),
+  ).toBeDefined();
+  fireEvent.change(screen.getByLabelText('To Container ID (bottle)'), {
+    target: { value: '3' },
+  });
+  fireEvent.change(screen.getByLabelText('Amount'), {
+    target: { value: '750' },
+  });
+  fireEvent.change(screen.getByLabelText('Unit'), {
+    target: { value: 'mL' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Record Bottling' }));
+
+  await waitFor(() => {
+    expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/bottle', expect.objectContaining({
+      from_container_id: 4,
+      to_container_id: 3,
+      amount: 750,
+      unit: 'mL',
+    }));
+  });
+  expect(await screen.findByText('Next bottle should be 4')).toBeDefined();
+  expect(
+    (screen.getByLabelText('To Container ID (bottle)') as HTMLInputElement).value,
+  ).toBe('4');
 });

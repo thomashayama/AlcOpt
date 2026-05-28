@@ -13,9 +13,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  ActiveFermentationSummary,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 export function StartTab() {
-  const [containerId, setContainerId] = useState(1);
+  const [containerId, setContainerId] = useState<ContainerIdValue>('');
   const [startDate, setStartDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -50,7 +54,7 @@ export function StartTab() {
     setMessage(null);
     try {
       const log = await api.post<ContainerLogOut>('/api/brew/fermentations', {
-        container_id: containerId,
+        container_id: Number(containerId),
         start_date: startDate,
         stage,
       });
@@ -75,10 +79,18 @@ export function StartTab() {
         <CardHeader><CardTitle>Start Fermentation</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <ActiveFermentationSummary />
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="s_container">Container ID</Label>
-                <Input id="s_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} required />
+                <Input
+                  id="s_container"
+                  type="number"
+                  min={1}
+                  value={containerId}
+                  onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="s_date">Start Date</Label>
@@ -90,7 +102,7 @@ export function StartTab() {
               </div>
             </div>
             <Message message={message} />
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || containerId === ''}>
               {submitting ? 'Starting...' : 'Start Fermentation'}
             </Button>
           </form>

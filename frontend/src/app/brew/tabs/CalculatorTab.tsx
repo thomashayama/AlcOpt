@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
+import { UnitSelect } from './brewFormHelpers';
 
 interface AbvResult {
   max_abv?: number;
@@ -127,12 +128,13 @@ export function CalculatorTab() {
                               onChange={(e) => updateSelected(ing.id, 'amount', Number(e.target.value))}
                               className="w-28"
                             />
-                            <Input
-                              type="text"
-                              placeholder="Unit"
+                            <UnitSelect
+                              id={`calc_unit_${ing.id}`}
+                              label={`Unit for ${ing.name}`}
+                              labelClassName="sr-only"
                               value={selected.find((s) => s.ingredient_id === ing.id)?.unit ?? 'g'}
-                              onChange={(e) => updateSelected(ing.id, 'unit', e.target.value)}
-                              className="w-20"
+                              onChange={(value) => updateSelected(ing.id, 'unit', value)}
+                              className="w-24"
                             />
                           </div>
                         )}

@@ -13,9 +13,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  ActiveFermentationSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 export function MassTab() {
-  const [containerId, setContainerId] = useState(1);
+  const [containerId, setContainerId] = useState<ContainerIdValue>('');
   const [measurementDate, setMeasurementDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -54,7 +58,7 @@ export function MassTab() {
     setMessage(null);
     try {
       const measurement = await api.post<MassMeasurementOut>('/api/brew/mass-measurements', {
-        container_id: containerId,
+        container_id: Number(containerId),
         measurement_date: measurementDate,
         mass,
       });
@@ -101,10 +105,22 @@ export function MassTab() {
         <CardHeader><CardTitle>Record Mass Measurement</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <ActiveFermentationSelect
+              id="mass_active_fermentation"
+              value={containerId}
+              onChange={setContainerId}
+            />
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="mass_container">Container ID</Label>
-                <Input id="mass_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} required />
+                <Input
+                  id="mass_container"
+                  type="number"
+                  min={1}
+                  value={containerId}
+                  onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mass_date">Measurement Date</Label>
@@ -117,7 +133,7 @@ export function MassTab() {
             </div>
             <Message message={message} />
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || containerId === ''}>
                 {submitting ? 'Recording...' : 'Record Measurement'}
               </Button>
               {lastMeasurement && (

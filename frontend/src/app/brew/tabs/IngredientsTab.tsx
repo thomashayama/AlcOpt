@@ -13,6 +13,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { UnitSelect } from './brewFormHelpers';
 
 interface IngredientAdditionResponse {
   id: number;
@@ -285,10 +286,12 @@ export function IngredientsTab() {
                 <Label htmlFor="add_end">Ending Amount</Label>
                 <Input id="add_end" type="number" step={0.01} value={endingAmount} onChange={(e) => setEndingAmount(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="add_unit">Unit</Label>
-                <Input id="add_unit" type="text" value={addUnit} onChange={(e) => setAddUnit(e.target.value)} />
-              </div>
+              <UnitSelect
+                id="add_unit"
+                label="Unit"
+                value={addUnit}
+                onChange={setAddUnit}
+              />
             </div>
             {calculatedAdditionAmount !== null && (
               <p className="text-sm text-muted-foreground">

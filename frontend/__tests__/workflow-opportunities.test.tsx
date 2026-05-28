@@ -46,7 +46,7 @@ vi.mock('next/navigation', () => ({
 const mockedApi = vi.mocked(api);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   authState.user = {
     email: 'user@test.com',
     name: 'User',
@@ -87,6 +87,40 @@ test('calculator renders sugar concentration and volume returned by the backend'
 
   expect(await screen.findByText('115.4 g/L')).toBeDefined();
   expect(await screen.findByText('1.25 L')).toBeDefined();
+});
+
+test('calculator uses a unit dropdown with valid backend units', async () => {
+  mockedApi.get.mockResolvedValue([
+    {
+      id: 1,
+      name: 'Grape Juice',
+      sugar_content: 200,
+      ingredient_type: 'Liquid',
+      density: 1.05,
+    },
+  ]);
+  mockedApi.post.mockResolvedValue({
+    max_abv: 6.7,
+    sugar_content_g_per_l: 115.4,
+    volume_l: 1.25,
+  });
+
+  render(<CalculatorTab />);
+
+  fireEvent.click(await screen.findByLabelText('Grape Juice (Liquid)'));
+  fireEvent.change(screen.getByPlaceholderText('Amount'), {
+    target: { value: '1250' },
+  });
+  fireEvent.change(screen.getByLabelText('Unit for Grape Juice'), {
+    target: { value: 'mL' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate ABV' }));
+
+  await waitFor(() => {
+    expect(mockedApi.post).toHaveBeenCalledWith('/api/brew/calculate-abv', expect.objectContaining({
+      ingredients: [expect.objectContaining({ unit: 'mL' })],
+    }));
+  });
 });
 
 test('vessel creation tells the user which container id to label', async () => {

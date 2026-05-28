@@ -37,6 +37,15 @@ export interface ContainerLogOut {
   stage?: string | null;
 }
 
+export interface FermentationActiveOut {
+  fermentation_id: number;
+  start_date: string;
+  container_id: number;
+  container_type: string;
+  stage?: string | null;
+  log_start_date: string;
+}
+
 export interface ReviewOut {
   id: number;
   container_id: number;
