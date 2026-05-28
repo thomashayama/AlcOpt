@@ -13,6 +13,7 @@ from alcopt.api.schemas import (
     FermentationActiveOut,
     FermentationEndRequest,
     FermentationOut,
+    IngredientAdditionOut,
     IngredientAdditionCreate,
     IngredientAdditionResponse,
     IngredientCreate,
@@ -37,10 +38,8 @@ from alcopt.database.models import (
 from alcopt.database.utils import close_open_log, current_fermentation_log
 from alcopt.streamlit_utils import (
     all_container_log_info,
-    all_ingredient_additions_info,
     all_sg_measurement_info,
 )
-from alcopt.database.utils import all_mass_measurement_info
 from alcopt.utils import (
     BENCHMARK,
     YEAST,
@@ -238,12 +237,45 @@ def add_ingredient_addition(
     }
 
 
-@router.get("/additions")
+@router.get("/additions", response_model=list[IngredientAdditionOut])
 def list_additions(
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
-    return all_ingredient_additions_info(db)
+    additions = (
+        db.query(IngredientAddition)
+        .join(Ingredient, Ingredient.id == IngredientAddition.ingredient_id)
+        .order_by(IngredientAddition.added_at, IngredientAddition.id)
+        .all()
+    )
+    return [
+        IngredientAdditionOut(
+            id=addition.id,
+            container_id=addition.container_id,
+            ingredient_id=addition.ingredient_id,
+            added_at=addition.added_at,
+            amount=addition.amount,
+            unit=addition.unit,
+            notes=addition.notes,
+            ingredient_name=addition.ingredient.name if addition.ingredient else None,
+        )
+        for addition in additions
+    ]
+
+
+@router.post("/additions/{addition_id}/undo")
+def undo_ingredient_addition(
+    addition_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    addition = db.get(IngredientAddition, addition_id)
+    if not addition:
+        raise HTTPException(404, f"Ingredient addition {addition_id} not found")
+
+    db.delete(addition)
+    db.commit()
+    return {"message": f"Ingredient addition {addition_id} undone"}
 
 
 @router.post("/sg-measurements", response_model=SgMeasurementOut)
@@ -277,6 +309,21 @@ def list_sg_measurements(
     return all_sg_measurement_info(db)
 
 
+@router.post("/sg-measurements/{measurement_id}/undo")
+def undo_sg_measurement(
+    measurement_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    measurement = db.get(SpecificGravityMeasurement, measurement_id)
+    if not measurement:
+        raise HTTPException(404, f"SG measurement {measurement_id} not found")
+
+    db.delete(measurement)
+    db.commit()
+    return {"message": f"SG measurement {measurement_id} undone"}
+
+
 @router.post("/mass-measurements", response_model=MassMeasurementOut)
 def add_mass_measurement(
     body: MassMeasurementCreate,
@@ -300,12 +347,31 @@ def add_mass_measurement(
     return measurement
 
 
-@router.get("/mass-measurements")
+@router.get("/mass-measurements", response_model=list[MassMeasurementOut])
 def list_mass_measurements(
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
-    return all_mass_measurement_info(db)
+    return (
+        db.query(MassMeasurement)
+        .order_by(MassMeasurement.measurement_date, MassMeasurement.id)
+        .all()
+    )
+
+
+@router.post("/mass-measurements/{measurement_id}/undo")
+def undo_mass_measurement(
+    measurement_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    measurement = db.get(MassMeasurement, measurement_id)
+    if not measurement:
+        raise HTTPException(404, f"Mass measurement {measurement_id} not found")
+
+    db.delete(measurement)
+    db.commit()
+    return {"message": f"Mass measurement {measurement_id} undone"}
 
 
 @router.post("/rack", response_model=ContainerLogOut)

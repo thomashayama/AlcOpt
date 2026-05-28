@@ -49,12 +49,15 @@ export function StartTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/brew/fermentations', {
+      const log = await api.post<ContainerLogOut>('/api/brew/fermentations', {
         container_id: containerId,
         start_date: startDate,
         stage,
       });
-      setMessage({ type: 'success', text: 'Fermentation started successfully!' });
+      setMessage({
+        type: 'success',
+        text: `Fermentation ${log.fermentation_id} started in container ${log.container_id} (log ${log.id}).`,
+      });
       fetchLogs();
     } catch (err) {
       setMessage({

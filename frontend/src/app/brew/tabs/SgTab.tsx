@@ -27,6 +27,10 @@ export function SgTab() {
   } | null>(null);
   const [measurements, setMeasurements] = useState<SgMeasurementOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastMeasurement, setLastMeasurement] = useState<SgMeasurementOut | null>(
+    null,
+  );
+  const [undoing, setUndoing] = useState(false);
 
   const fetchMeasurements = async () => {
     try {
@@ -49,12 +53,16 @@ export function SgTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/brew/sg-measurements', {
+      const measurement = await api.post<SgMeasurementOut>('/api/brew/sg-measurements', {
         container_id: containerId,
         measurement_date: measurementDate,
         specific_gravity: sg,
       });
-      setMessage({ type: 'success', text: 'SG measurement recorded!' });
+      setLastMeasurement(measurement);
+      setMessage({
+        type: 'success',
+        text: `SG measurement ${measurement.id} recorded for fermentation ${measurement.fermentation_id}: ${measurement.specific_gravity}.`,
+      });
       fetchMeasurements();
     } catch (err) {
       setMessage({
@@ -63,6 +71,27 @@ export function SgTab() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!lastMeasurement) return;
+    setUndoing(true);
+    setMessage(null);
+    try {
+      const result = await api.post<{ message: string }>(
+        `/api/brew/sg-measurements/${lastMeasurement.id}/undo`,
+      );
+      setLastMeasurement(null);
+      setMessage({ type: 'success', text: result.message });
+      fetchMeasurements();
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to undo measurement',
+      });
+    } finally {
+      setUndoing(false);
     }
   };
 
@@ -87,9 +116,21 @@ export function SgTab() {
               </div>
             </div>
             <Message message={message} />
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Recording...' : 'Record Measurement'}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Recording...' : 'Record Measurement'}
+              </Button>
+              {lastMeasurement && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleUndo}
+                  disabled={undoing}
+                >
+                  {undoing ? 'Undoing...' : 'Undo Last SG Measurement'}
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>

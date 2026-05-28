@@ -8,6 +8,9 @@ from alcopt.database.models import (
     ContainerFermentationLog,
     Fermentation,
     Ingredient,
+    IngredientAddition,
+    MassMeasurement,
+    SpecificGravityMeasurement,
 )
 
 
@@ -233,6 +236,61 @@ def test_list_additions(admin_client):
     assert resp.status_code == 200
 
 
+def test_list_additions_returns_api_shape(admin_client):
+    _seed_container_with_fermentation()
+    _seed_ingredient()
+    create_resp = admin_client.post(
+        "/api/brew/additions",
+        json={
+            "container_id": 1,
+            "ingredient_name": "Grape Juice",
+            "date": "2025-01-02",
+            "starting_amount": 0.0,
+            "ending_amount": 1000.0,
+            "unit": "mL",
+        },
+    )
+    assert create_resp.status_code == 200
+
+    resp = admin_client.get("/api/brew/additions")
+
+    assert resp.status_code == 200
+    item = resp.json()[0]
+    assert item["id"] == create_resp.json()["id"]
+    assert item["container_id"] == 1
+    assert item["ingredient_id"] == 1
+    assert item["ingredient_name"] == "Grape Juice"
+    assert item["added_at"].startswith("2025-01-02")
+    assert item["amount"] == 1000.0
+    assert item["unit"] == "mL"
+
+
+def test_undo_ingredient_addition_deletes_record(admin_client):
+    _seed_container_with_fermentation()
+    _seed_ingredient()
+    create_resp = admin_client.post(
+        "/api/brew/additions",
+        json={
+            "container_id": 1,
+            "ingredient_name": "Grape Juice",
+            "date": "2025-01-02",
+            "starting_amount": 0.0,
+            "ending_amount": 1000.0,
+            "unit": "mL",
+        },
+    )
+    assert create_resp.status_code == 200
+    addition_id = create_resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/additions/{addition_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(IngredientAddition, addition_id) is None
+    db.close()
+
+
 # --- SG Measurements ---
 
 
@@ -250,6 +308,28 @@ def test_add_sg_measurement(admin_client):
     data = resp.json()
     assert data["specific_gravity"] == 1.090
     assert data["fermentation_id"] == 1
+
+
+def test_undo_sg_measurement_deletes_record(admin_client):
+    _seed_container_with_fermentation()
+    create_resp = admin_client.post(
+        "/api/brew/sg-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "specific_gravity": 1.090,
+        },
+    )
+    assert create_resp.status_code == 200
+    measurement_id = create_resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/sg-measurements/{measurement_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(SpecificGravityMeasurement, measurement_id) is None
+    db.close()
 
 
 def test_add_sg_no_fermentation(admin_client):
@@ -281,6 +361,50 @@ def test_add_mass_measurement(admin_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["mass"] == 5200.0
+
+
+def test_list_mass_measurements_returns_api_shape(admin_client):
+    _seed_container_with_fermentation()
+    create_resp = admin_client.post(
+        "/api/brew/mass-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "mass": 5200.0,
+        },
+    )
+    assert create_resp.status_code == 200
+
+    resp = admin_client.get("/api/brew/mass-measurements")
+
+    assert resp.status_code == 200
+    item = resp.json()[0]
+    assert item["id"] == create_resp.json()["id"]
+    assert item["fermentation_id"] == 1
+    assert item["measurement_date"] == "2025-01-15"
+    assert item["mass"] == 5200.0
+
+
+def test_undo_mass_measurement_deletes_record(admin_client):
+    _seed_container_with_fermentation()
+    create_resp = admin_client.post(
+        "/api/brew/mass-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "mass": 5200.0,
+        },
+    )
+    assert create_resp.status_code == 200
+    measurement_id = create_resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/mass-measurements/{measurement_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(MassMeasurement, measurement_id) is None
+    db.close()
 
 
 def test_add_mass_no_fermentation(admin_client):

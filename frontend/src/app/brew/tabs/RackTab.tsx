@@ -50,13 +50,16 @@ export function RackTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/brew/rack', {
+      const log = await api.post<ContainerLogOut>('/api/brew/rack', {
         from_container_id: fromContainerId,
         to_container_id: toContainerId,
         date: rackDate,
         stage,
       });
-      setMessage({ type: 'success', text: 'Racking recorded!' });
+      setMessage({
+        type: 'success',
+        text: `Rack recorded: fermentation ${log.fermentation_id} moved from container ${log.source_container_id ?? fromContainerId} to ${log.container_id} (log ${log.id}).`,
+      });
       fetchLogs();
     } catch (err) {
       setMessage({
