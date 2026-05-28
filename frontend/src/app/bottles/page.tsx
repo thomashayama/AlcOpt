@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
 import type { ContainerOut } from '@/lib/types';
+import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,8 +48,11 @@ function VesselTab() {
         '/api/containers?container_type=carboy',
       );
       setVessels(data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to load vessels',
+      });
     } finally {
       setLoading(false);
     }
@@ -63,14 +67,17 @@ function VesselTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/containers', {
+      const created = await api.post<ContainerOut>('/api/containers', {
         container_type: containerType,
         volume_liters: volume,
         material,
         empty_mass: emptyMass,
         date_added: dateAdded,
       });
-      setMessage({ type: 'success', text: 'Vessel added successfully!' });
+      setMessage({
+        type: 'success',
+        text: `Vessel created: Container ID ${created.id}. Label this vessel ${created.id}.`,
+      });
       fetchVessels();
     } catch (err) {
       setMessage({
@@ -143,17 +150,7 @@ function VesselTab() {
               </div>
             </div>
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Adding...' : 'Add Vessel'}
@@ -226,8 +223,11 @@ export function BottleTab() {
       setNextContainerId(
         data.length > 0 ? Math.max(...data.map((container) => container.id)) + 1 : null,
       );
-    } catch {
-      // silently fail
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to load bottles',
+      });
     } finally {
       setLoading(false);
     }
@@ -309,17 +309,7 @@ export function BottleTab() {
               </div>
             </div>
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Adding...' : 'Add Bottle'}

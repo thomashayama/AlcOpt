@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
 import type { ReviewOut } from '@/lib/types';
+import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -334,6 +335,8 @@ function TastingPage() {
   const [rubricOpen, setRubricOpen] = useState(false);
   const [reviews, setReviews] = useState<ReviewOut[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [lastReview, setLastReview] = useState<ReviewOut | null>(null);
+  const [undoing, setUndoing] = useState(false);
 
   const fetchReviews = async () => {
     try {
@@ -358,13 +361,17 @@ function TastingPage() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/reviews', {
+      const review = await api.post<ReviewOut>('/api/reviews', {
         container_id: containerId,
         tasting_date: tastingDate,
         ...ratings,
         ...(user ? {} : { email }),
       });
-      setMessage({ type: 'success', text: 'Review submitted successfully!' });
+      setLastReview(user ? review : null);
+      setMessage({
+        type: 'success',
+        text: `Review ${review.id} submitted for container ${review.container_id} (fermentation ${review.fermentation_id}).`,
+      });
       if (user) fetchReviews();
     } catch (err) {
       setMessage({
@@ -373,6 +380,27 @@ function TastingPage() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!lastReview) return;
+    setUndoing(true);
+    setMessage(null);
+    try {
+      const result = await api.post<{ message: string }>(
+        `/api/reviews/${lastReview.id}/undo`,
+      );
+      setLastReview(null);
+      setMessage({ type: 'success', text: result.message });
+      fetchReviews();
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to undo review',
+      });
+    } finally {
+      setUndoing(false);
     }
   };
 
@@ -527,21 +555,23 @@ function TastingPage() {
               </div>
             ))}
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Submitting...' : 'Submit Review'}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Submitting...' : 'Submit Review'}
+              </Button>
+              {lastReview && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleUndo}
+                  disabled={undoing}
+                >
+                  {undoing ? 'Undoing...' : 'Undo Last Review'}
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from unum import units
 
 from alcopt.api.dependencies import get_db, require_admin
 from alcopt.api.schemas import (
@@ -44,6 +45,7 @@ from alcopt.utils import (
     BENCHMARK,
     YEAST,
     calculate_max_potential_abv,
+    mL,
     str2unit,
 )
 
@@ -518,12 +520,18 @@ def calculate_abv(
             raise HTTPException(404, f"Ingredient {item.ingredient_id} not found")
         if item.unit not in str2unit:
             raise HTTPException(400, f"Unknown unit: {item.unit}")
+        ingredient_type = ingredient.ingredient_type or "Liquid"
+        is_solid = ingredient_type.lower() in {"solid", "solute"}
+        sugar_content = ingredient.sugar_content or 0
+        density = ingredient.density or 1.0
         ingredients_data.append(
             {
-                "ingredient_type": ingredient.ingredient_type or "Liquid",
+                "ingredient_type": ingredient_type,
                 "amount": item.amount * str2unit[item.unit],
-                "sugar_content": ingredient.sugar_content or 0,
-                "density": ingredient.density or 1.0,
+                "sugar_content": sugar_content
+                if is_solid
+                else sugar_content * units.g / units.L,
+                "density": density if is_solid else density * units.g / mL,
             }
         )
 
@@ -539,11 +547,17 @@ def calculate_abv(
         benchmarks.append(entry)
 
     return {
-        "max_abv": float(max_abv) if max_abv else 0,
-        "sugar_content_g_per_l": float(sugar_content.asNumber())
-        if sugar_content
+        "max_abv": float(max_abv.asNumber())
+        if hasattr(max_abv, "asNumber")
+        else float(max_abv),
+        "sugar_content_g_per_l": float(
+            sugar_content.asUnit(units.g / units.L).asNumber()
+        )
+        if sugar_content is not None
         else 0,
-        "volume_l": float(volume.asNumber()) if volume else 0,
+        "volume_l": float(volume.asUnit(units.L).asNumber())
+        if volume is not None
+        else 0,
         "container_volume_l": container.volume_liters,
         "benchmarks": benchmarks,
         "yeast": YEAST,

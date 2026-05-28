@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from tests.conftest import TestSession
-from alcopt.database.models import Container, ContainerFermentationLog, Fermentation
+from alcopt.database.models import Container, ContainerFermentationLog, Fermentation, Review
 
 
 def _seed_container_with_fermentation():
@@ -137,6 +137,65 @@ def test_my_reviews(user_client):
     data = resp.json()
     assert len(data) == 1
     assert data[0]["name"] == "user@test.com"
+
+
+def test_undo_review_deletes_own_review(user_client):
+    _seed_container_with_fermentation()
+    create = user_client.post(
+        "/api/reviews",
+        json={
+            "container_id": 1,
+            "tasting_date": "2025-06-01",
+            "overall_rating": 4.0,
+            "boldness": 3.0,
+            "tannicity": 2.5,
+            "sweetness": 3.5,
+            "acidity": 2.0,
+            "complexity": 4.5,
+        },
+    )
+    assert create.status_code == 200
+    review_id = create.json()["id"]
+
+    undo = user_client.post(f"/api/reviews/{review_id}/undo")
+
+    assert undo.status_code == 200
+    assert undo.json()["message"] == f"Review {review_id} undone"
+    db = TestSession()
+    assert db.get(Review, review_id) is None
+    db.close()
+
+
+def test_undo_review_rejects_other_user(user_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    db.add(
+        Review(
+            id=33,
+            container_id=1,
+            name="other@test.com",
+            fermentation_id=1,
+            overall_rating=4.0,
+            boldness=3.0,
+            tannicity=2.5,
+            sweetness=3.5,
+            acidity=2.0,
+            complexity=4.5,
+            review_date=date(2025, 6, 1),
+        )
+    )
+    db.commit()
+    db.close()
+
+    undo = user_client.post("/api/reviews/33/undo")
+
+    assert undo.status_code == 403
+
+
+def test_undo_review_requires_login(client):
+    undo = client.post("/api/reviews/33/undo")
+
+    assert undo.status_code == 401
 
 
 def test_all_reviews_requires_admin(user_client):

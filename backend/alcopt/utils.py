@@ -153,8 +153,10 @@ def calculate_max_potential_abv(ingredients):
 def reviews_to_df(reviews: list) -> list[dict]:
     return [
         {
+            "id": review.id,
             "name": review.name,
             "container_id": review.container_id,
+            "fermentation_id": review.fermentation_id,
             "overall_rating": review.overall_rating,
             "boldness": review.boldness,
             "tannicity": review.tannicity,

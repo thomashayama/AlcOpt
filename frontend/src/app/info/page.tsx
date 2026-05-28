@@ -210,6 +210,45 @@ function InfoPage() {
             </Card>
           )}
 
+          {data.fermentation_log && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Container Log #{data.fermentation_log.id}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+                  {data.fermentation_log.stage && (
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Stage</dt>
+                      <dd className="font-medium">{data.fermentation_log.stage}</dd>
+                    </div>
+                  )}
+                  {data.fermentation_log.source_container_id != null && (
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Source Container</dt>
+                      <dd className="font-medium">
+                        {data.fermentation_log.source_container_id}
+                      </dd>
+                    </div>
+                  )}
+                  {data.fermentation_log.amount != null && (
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Held Amount</dt>
+                      <dd className="font-medium">
+                        {data.fermentation_log.amount}
+                        {data.fermentation_log.unit ? ` ${data.fermentation_log.unit}` : ''}
+                      </dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt className="text-sm text-muted-foreground">Log Start</dt>
+                    <dd className="font-medium">{data.fermentation_log.start_date}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+
           {/* SG Chart */}
           {sgChartData.length > 0 && (
             <Card>

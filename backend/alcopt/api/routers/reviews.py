@@ -10,6 +10,7 @@ from alcopt.api.dependencies import (
     require_admin,
 )
 from alcopt.api.schemas import ReviewCreate, ReviewOut
+from alcopt.auth import is_admin
 from alcopt.database.models import Container, Review
 from alcopt.database.utils import current_fermentation_log, latest_fermentation_log
 
@@ -53,6 +54,23 @@ def create_review(
     db.commit()
     db.refresh(review)
     return review
+
+
+@router.post("/{review_id}/undo")
+def undo_review(
+    review_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    review = db.get(Review, review_id)
+    if not review:
+        raise HTTPException(404, f"Review {review_id} not found")
+    if review.name != user["email"] and not is_admin(user["email"]):
+        raise HTTPException(403, "Cannot undo another user's review")
+
+    db.delete(review)
+    db.commit()
+    return {"message": f"Review {review_id} undone"}
 
 
 @router.get("/mine", response_model=list[ReviewOut])

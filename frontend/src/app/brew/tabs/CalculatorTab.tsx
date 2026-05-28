@@ -13,8 +13,9 @@ import {
 
 interface AbvResult {
   max_abv?: number;
-  sugar_content?: number;
-  volume?: number;
+  sugar_content_g_per_l?: number;
+  volume_l?: number;
+  container_volume_l?: number | null;
 }
 
 interface CalculatorIngredient {
@@ -159,15 +160,15 @@ export function CalculatorTab() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Sugar Content</p>
+                    <p className="text-muted-foreground">Sugar Concentration</p>
                     <p className="text-lg font-semibold">
-                      {result.sugar_content != null ? `${result.sugar_content.toFixed(1)} g` : '-'}
+                      {result.sugar_content_g_per_l != null ? `${result.sugar_content_g_per_l.toFixed(1)} g/L` : '-'}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Volume</p>
                     <p className="text-lg font-semibold">
-                      {result.volume != null ? `${result.volume.toFixed(1)} mL` : '-'}
+                      {result.volume_l != null ? `${result.volume_l.toFixed(2)} L` : '-'}
                     </p>
                   </div>
                 </div>

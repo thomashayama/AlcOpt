@@ -173,6 +173,39 @@ def test_list_ingredients(admin_client):
     assert data[0]["name"] == "Grape Juice"
 
 
+def test_calculate_abv_with_liquid_ingredient(admin_client):
+    _seed_containers()
+    ingredient_resp = admin_client.post(
+        "/api/brew/ingredients",
+        json={
+            "name": "Grape Juice",
+            "sugar_content": 200.0,
+            "ingredient_type": "Liquid",
+            "density": 1.0,
+            "price": 4.0,
+            "notes": "",
+        },
+    )
+    assert ingredient_resp.status_code == 200
+    ingredient_id = ingredient_resp.json()["id"]
+
+    resp = admin_client.post(
+        "/api/brew/calculate-abv",
+        json={
+            "container_id": 1,
+            "ingredients": [
+                {"ingredient_id": ingredient_id, "amount": 1250, "unit": "mL"}
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sugar_content_g_per_l"] == 200.0
+    assert data["volume_l"] == 1.25
+    assert data["container_volume_l"] == 5.0
+
+
 # --- Ingredient Additions ---
 
 
