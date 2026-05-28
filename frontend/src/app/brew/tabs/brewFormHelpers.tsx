@@ -15,6 +15,16 @@ function toDate(value: string) {
   return value.slice(0, 10);
 }
 
+function isActiveFermentation(value: unknown): value is FermentationActiveOut {
+  if (typeof value !== 'object' || value === null) return false;
+  const item = value as Partial<FermentationActiveOut>;
+  return typeof item.fermentation_id === 'number'
+    && typeof item.container_id === 'number'
+    && typeof item.container_type === 'string'
+    && typeof item.start_date === 'string'
+    && typeof item.log_start_date === 'string';
+}
+
 export function formatActiveFermentation(active: FermentationActiveOut) {
   return `Container ${active.container_id} - fermentation ${active.fermentation_id} - ${active.stage ?? 'active'} - ${active.container_type} - started ${toDate(active.start_date)}`;
 }
@@ -23,7 +33,7 @@ export function formatActiveFermentationSummary(active: FermentationActiveOut) {
   return `Active: container ${active.container_id}, fermentation ${active.fermentation_id}, ${active.stage ?? 'active'}, started ${toDate(active.start_date)}`;
 }
 
-function useActiveFermentations() {
+export function useActiveFermentations() {
   const [active, setActive] = useState<FermentationActiveOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +42,9 @@ function useActiveFermentations() {
     let cancelled = false;
     api.get<FermentationActiveOut[]>('/api/brew/fermentations/active')
       .then((data) => {
-        if (!cancelled) setActive(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          setActive(Array.isArray(data) ? data.filter(isActiveFermentation) : []);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -80,19 +92,26 @@ export function ActiveFermentationSelect({
   label = 'Active Fermentation',
   value,
   onChange,
+  onActiveChange,
 }: {
   id: string;
   label?: string;
   value: ContainerIdValue;
   onChange: (value: ContainerIdValue) => void;
+  onActiveChange?: (active: FermentationActiveOut | null) => void;
 }) {
   const { active, loading, error } = useActiveFermentations();
 
   useEffect(() => {
     if (value === '' && active.length > 0) {
       onChange(active[0].container_id);
+      onActiveChange?.(active[0]);
+      return;
     }
-  }, [active, onChange, value]);
+    onActiveChange?.(
+      active.find((item) => item.container_id === value) ?? null,
+    );
+  }, [active, onActiveChange, onChange, value]);
 
   const selectedValue = active.some((item) => item.container_id === value)
     ? String(value)

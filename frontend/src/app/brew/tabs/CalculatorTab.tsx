@@ -10,7 +10,11 @@ import { Label } from '@/components/ui/label';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import { UnitSelect } from './brewFormHelpers';
+import {
+  ActiveFermentationSelect,
+  UnitSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 interface AbvResult {
   max_abv?: number;
@@ -27,7 +31,7 @@ interface CalculatorIngredient {
 }
 
 export function CalculatorTab() {
-  const [containerId, setContainerId] = useState(1);
+  const [containerId, setContainerId] = useState<ContainerIdValue>('');
   const [ingredients, setIngredients] = useState<IngredientOut[]>([]);
   const [selected, setSelected] = useState<CalculatorIngredient[]>([]);
   const [result, setResult] = useState<AbvResult | null>(null);
@@ -69,7 +73,7 @@ export function CalculatorTab() {
     setResult(null);
     try {
       const data = await api.post<AbvResult>('/api/brew/calculate-abv', {
-        container_id: containerId,
+        container_id: Number(containerId),
         ingredients: selected.map((s) => ({
           ingredient_id: s.ingredient_id,
           amount: s.amount,
@@ -93,9 +97,20 @@ export function CalculatorTab() {
         <CardHeader><CardTitle>ABV Calculator</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <ActiveFermentationSelect
+              id="calc_active_fermentation"
+              value={containerId}
+              onChange={setContainerId}
+            />
             <div className="space-y-2">
               <Label htmlFor="calc_container">Container ID</Label>
-              <Input id="calc_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} />
+              <Input
+                id="calc_container"
+                type="number"
+                min={1}
+                value={containerId}
+                onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+              />
             </div>
 
             <div className="space-y-2">
@@ -147,7 +162,7 @@ export function CalculatorTab() {
 
             <Message message={message} />
 
-            <Button onClick={handleCalculate} disabled={submitting || selected.length === 0}>
+            <Button onClick={handleCalculate} disabled={submitting || selected.length === 0 || containerId === ''}>
               {submitting ? 'Calculating...' : 'Calculate ABV'}
             </Button>
 

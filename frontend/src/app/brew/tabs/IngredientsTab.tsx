@@ -13,7 +13,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { UnitSelect } from './brewFormHelpers';
+import {
+  ActiveFermentationSelect,
+  UnitSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 interface IngredientAdditionResponse {
   id: number;
@@ -43,7 +47,7 @@ export function IngredientsTab() {
     text: string;
   } | null>(null);
 
-  const [addContainerId, setAddContainerId] = useState(1);
+  const [addContainerId, setAddContainerId] = useState<ContainerIdValue>('');
   const [addIngredientName, setAddIngredientName] = useState('');
   const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
   const [startingAmount, setStartingAmount] = useState<number | ''>('');
@@ -135,7 +139,7 @@ export function IngredientsTab() {
       const endValue = endingAmount === '' ? 0 : endingAmount;
       const amount = endValue - startValue;
       const result = await api.post<IngredientAdditionResponse>('/api/brew/additions', {
-        container_id: addContainerId,
+        container_id: Number(addContainerId),
         ingredient_name: addIngredientName,
         date: addDate,
         starting_amount: startValue,
@@ -145,7 +149,7 @@ export function IngredientsTab() {
       setLastAddition(result);
       setAddMessage({
         type: 'success',
-        text: `Addition ${result.id} recorded for container ${addContainerId}: ${addIngredientName} ${formatAmount(amount)} ${addUnit} (${result.fermentation_id == null ? 'no active fermentation' : `fermentation ${result.fermentation_id}`}).`,
+        text: `Addition ${result.id} recorded for container ${Number(addContainerId)}: ${addIngredientName} ${formatAmount(amount)} ${addUnit} (${result.fermentation_id == null ? 'no active fermentation' : `fermentation ${result.fermentation_id}`}).`,
       });
       fetchAdditions();
     } catch (err) {
@@ -263,10 +267,22 @@ export function IngredientsTab() {
         <CardHeader><CardTitle>Add Ingredient to Container</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleAddAddition} className="space-y-4">
+            <ActiveFermentationSelect
+              id="add_active_fermentation"
+              value={addContainerId}
+              onChange={setAddContainerId}
+            />
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="add_container">Container ID</Label>
-                <Input id="add_container" type="number" min={1} value={addContainerId} onChange={(e) => setAddContainerId(Number(e.target.value))} required />
+                <Input
+                  id="add_container"
+                  type="number"
+                  min={1}
+                  value={addContainerId}
+                  onChange={(e) => setAddContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="add_ingredient">Ingredient Name</Label>
@@ -300,7 +316,7 @@ export function IngredientsTab() {
             )}
             <Message message={addMessage} />
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={addingAddition}>
+              <Button type="submit" disabled={addingAddition || addContainerId === ''}>
                 {addingAddition ? 'Adding...' : 'Add to Container'}
               </Button>
               {lastAddition && (

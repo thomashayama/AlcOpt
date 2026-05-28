@@ -25,10 +25,61 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
+const selectClassName = 'flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+
+const VESSEL_PRESETS = [
+  {
+    id: 'glass-2l-carboy',
+    label: '2 L glass carboy',
+    containerType: 'carboy',
+    material: 'Glass',
+    volume: 2,
+    emptyMass: 792,
+  },
+  {
+    id: 'glass-1gal-jug',
+    label: '1 gal glass jug',
+    containerType: 'carboy',
+    material: 'Glass',
+    volume: 3.8,
+    emptyMass: 1500,
+  },
+  {
+    id: 'plastic-bucket',
+    label: 'Plastic bucket',
+    containerType: 'bucket',
+    material: 'Plastic',
+    volume: 7.5,
+    emptyMass: 650,
+  },
+] as const;
+
+const BOTTLE_PRESETS = [
+  {
+    id: '500ml-bottle',
+    label: '500 mL bottle',
+    volume: 0.5,
+    emptyMass: 500,
+  },
+  {
+    id: '750ml-wine-bottle',
+    label: '750 mL wine bottle',
+    volume: 0.75,
+    emptyMass: 500,
+  },
+  {
+    id: '375ml-half-bottle',
+    label: '375 mL half bottle',
+    volume: 0.375,
+    emptyMass: 320,
+  },
+] as const;
+
 function VesselTab() {
   const [dateAdded, setDateAdded] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const [vesselPreset, setVesselPreset] = useState<string>(VESSEL_PRESETS[0].id);
   const [material, setMaterial] = useState('Glass');
   const [volume, setVolume] = useState(2.0);
   const [emptyMass, setEmptyMass] = useState(792.0);
@@ -61,6 +112,16 @@ function VesselTab() {
   useEffect(() => {
     fetchVessels();
   }, []);
+
+  const applyVesselPreset = (presetId: string) => {
+    setVesselPreset(presetId);
+    const preset = VESSEL_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setMaterial(preset.material);
+    setVolume(preset.volume);
+    setEmptyMass(preset.emptyMass);
+    setContainerType(preset.containerType);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +158,21 @@ function VesselTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="v_preset">Vessel Preset</Label>
+              <select
+                id="v_preset"
+                className={selectClassName}
+                value={vesselPreset}
+                onChange={(e) => applyVesselPreset(e.target.value)}
+              >
+                {VESSEL_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="v_date">Date Added</Label>
@@ -110,12 +186,17 @@ function VesselTab() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="v_material">Material</Label>
-                <Input
+                <select
                   id="v_material"
-                  type="text"
+                  className={selectClassName}
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
-                />
+                >
+                  <option value="Glass">Glass</option>
+                  <option value="Plastic">Plastic</option>
+                  <option value="Stainless">Stainless</option>
+                  <option value="Ceramic">Ceramic</option>
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -141,12 +222,17 @@ function VesselTab() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="v_type">Type</Label>
-                <Input
+                <select
                   id="v_type"
-                  type="text"
+                  className={selectClassName}
                   value={containerType}
                   onChange={(e) => setContainerType(e.target.value)}
-                />
+                >
+                  <option value="carboy">carboy</option>
+                  <option value="bucket">bucket</option>
+                  <option value="demijohn">demijohn</option>
+                  <option value="tank">tank</option>
+                </select>
               </div>
             </div>
 
@@ -204,6 +290,7 @@ export function BottleTab() {
   const [dateAdded, setDateAdded] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const [bottlePreset, setBottlePreset] = useState<string>(BOTTLE_PRESETS[0].id);
   const [volume, setVolume] = useState(0.5);
   const [emptyMass, setEmptyMass] = useState(500.0);
   const [submitting, setSubmitting] = useState(false);
@@ -236,6 +323,14 @@ export function BottleTab() {
   useEffect(() => {
     fetchBottles();
   }, []);
+
+  const applyBottlePreset = (presetId: string) => {
+    setBottlePreset(presetId);
+    const preset = BOTTLE_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setVolume(preset.volume);
+    setEmptyMass(preset.emptyMass);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,6 +371,21 @@ export function BottleTab() {
                 ? 'Next bottle ID will be shown after bottles load.'
                 : `Next bottle ID should be ${nextContainerId}`}
             </p>
+            <div className="space-y-2">
+              <Label htmlFor="b_preset">Bottle Preset</Label>
+              <select
+                id="b_preset"
+                className={selectClassName}
+                value={bottlePreset}
+                onChange={(e) => applyBottlePreset(e.target.value)}
+              >
+                {BOTTLE_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="b_date">Date Added</Label>

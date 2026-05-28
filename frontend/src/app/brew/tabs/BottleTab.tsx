@@ -1,8 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import type { ContainerInfoResponse, ContainerLogOut } from '@/lib/types';
+import type {
+  ContainerInfoResponse,
+  ContainerLogOut,
+  FermentationActiveOut,
+  FermentationOut,
+} from '@/lib/types';
 import { Message } from '@/components/Message';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -57,6 +62,23 @@ export function BottleTab() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+  const [finishContainerId, setFinishContainerId] = useState<ContainerIdValue>('');
+  const [finishFermentationId, setFinishFermentationId] = useState<number | ''>('');
+  const [finishDate, setFinishDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [finishEndMass, setFinishEndMass] = useState<number | ''>('');
+  const [finishing, setFinishing] = useState(false);
+  const [finishMessage, setFinishMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  const handleFinishActiveChange = useCallback((
+    active: FermentationActiveOut | null,
+  ) => {
+    setFinishFermentationId(active?.fermentation_id ?? '');
+  }, []);
 
   useEffect(() => {
     if (amountMode !== 'filledMass') {
@@ -206,6 +228,33 @@ export function BottleTab() {
         type: 'error',
         text: err instanceof Error ? err.message : 'Failed to empty container',
       });
+    }
+  };
+
+  const handleFinishFermentation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (finishFermentationId === '') return;
+    setFinishing(true);
+    setFinishMessage(null);
+    try {
+      const fermentation = await api.patch<FermentationOut>(
+        `/api/brew/fermentations/${finishFermentationId}`,
+        {
+          end_date: finishDate,
+          end_mass: finishEndMass === '' ? null : finishEndMass,
+        },
+      );
+      setFinishMessage({
+        type: 'success',
+        text: `Fermentation ${fermentation.id} finished.`,
+      });
+    } catch (err) {
+      setFinishMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to finish fermentation',
+      });
+    } finally {
+      setFinishing(false);
     }
   };
 
@@ -364,6 +413,52 @@ export function BottleTab() {
                 </Button>
               )}
             </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Finish Fermentation</CardTitle></CardHeader>
+        <CardContent>
+          <form onSubmit={handleFinishFermentation} className="space-y-4">
+            <ActiveFermentationSelect
+              id="finish_active_fermentation"
+              label="Active Fermentation to Finish"
+              value={finishContainerId}
+              onChange={setFinishContainerId}
+              onActiveChange={handleFinishActiveChange}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="finish_date">End Date</Label>
+                <Input
+                  id="finish_date"
+                  type="date"
+                  value={finishDate}
+                  onChange={(event) => setFinishDate(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="finish_end_mass">End Mass (g)</Label>
+                <Input
+                  id="finish_end_mass"
+                  type="number"
+                  step={0.1}
+                  value={finishEndMass}
+                  onChange={(event) => setFinishEndMass(
+                    event.target.value === '' ? '' : Number(event.target.value),
+                  )}
+                />
+              </div>
+            </div>
+            <Message message={finishMessage} />
+            <Button
+              type="submit"
+              disabled={finishing || finishFermentationId === ''}
+            >
+              {finishing ? 'Finishing...' : 'Finish Fermentation'}
+            </Button>
           </form>
         </CardContent>
       </Card>

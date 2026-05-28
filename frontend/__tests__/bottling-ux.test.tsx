@@ -177,8 +177,8 @@ test('bottling uses active fermentation source, unit dropdown, and advances to n
   render(<BrewBottleTab />);
 
   expect(
-    await screen.findByText('Container 4 - fermentation 9 - primary - carboy - started 2026-05-01'),
-  ).toBeDefined();
+    await screen.findAllByText('Container 4 - fermentation 9 - primary - carboy - started 2026-05-01'),
+  ).not.toHaveLength(0);
   fireEvent.change(screen.getByLabelText('To Container ID (bottle)'), {
     target: { value: '3' },
   });

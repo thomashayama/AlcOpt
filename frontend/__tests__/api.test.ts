@@ -38,6 +38,23 @@ test('post sends POST request with JSON body', async () => {
   }))
 })
 
+test('patch sends PATCH request with JSON body', async () => {
+  const mockData = { success: true }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(mockData),
+  }))
+
+  const body = { end_date: '2026-05-28' }
+  const result = await api.patch('/api/test', body)
+  expect(result).toEqual(mockData)
+  expect(fetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))
+})
+
 test('throws ApiError on non-ok response', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: false,

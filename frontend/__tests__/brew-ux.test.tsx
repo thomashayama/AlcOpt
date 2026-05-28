@@ -178,6 +178,9 @@ test('ingredient creation selects it, addition previews amount, table renders AP
   }));
   expect((screen.getByLabelText('Ingredient Name') as HTMLInputElement).value).toBe('Honey');
 
+  fireEvent.change(screen.getByLabelText('Container ID'), {
+    target: { value: '1' },
+  });
   fireEvent.change(screen.getByLabelText('Starting Amount'), {
     target: { value: '0' },
   });
@@ -314,6 +317,9 @@ test('ingredient additions use a unit dropdown with valid backend units', async 
   render(<IngredientsTab />);
 
   await screen.findByText('Juice');
+  fireEvent.change(screen.getByLabelText('Container ID'), {
+    target: { value: '1' },
+  });
   fireEvent.change(screen.getByLabelText('Ingredient'), {
     target: { value: 'Juice' },
   });

@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
-import type { ReviewOut } from '@/lib/types';
+import type { ContainerInfoResponse, ReviewOut } from '@/lib/types';
 import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -311,8 +311,8 @@ function TastingPage() {
   const searchParams = useSearchParams();
   const prefilledId = searchParams.get('container_id');
 
-  const [containerId, setContainerId] = useState<number>(
-    prefilledId ? parseInt(prefilledId, 10) : 1,
+  const [containerId, setContainerId] = useState<number | ''>(
+    prefilledId ? parseInt(prefilledId, 10) : '',
   );
   const [tastingDate, setTastingDate] = useState(
     new Date().toISOString().slice(0, 10),
@@ -328,6 +328,13 @@ function TastingPage() {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const [containerContext, setContainerContext] =
+    useState<ContainerInfoResponse | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [contextMessage, setContextMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
@@ -356,13 +363,40 @@ function TastingPage() {
     }
   }, [user]);
 
+  const fetchContainerContext = useCallback(async (id: number | '') => {
+    if (id === '') return;
+    setContextLoading(true);
+    setContextMessage(null);
+    setContainerContext(null);
+    try {
+      const data = await api.get<ContainerInfoResponse>(`/api/containers/${id}`);
+      setContainerContext(data);
+    } catch (err) {
+      setContextMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to load container',
+      });
+    } finally {
+      setContextLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!prefilledId) return;
+    const parsed = parseInt(prefilledId, 10);
+    if (Number.isNaN(parsed)) return;
+    setContainerId(parsed);
+    fetchContainerContext(parsed);
+  }, [fetchContainerContext, prefilledId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (containerId === '') return;
     setSubmitting(true);
     setMessage(null);
     try {
       const review = await api.post<ReviewOut>('/api/reviews', {
-        container_id: containerId,
+        container_id: Number(containerId),
         tasting_date: tastingDate,
         ...ratings,
         ...(user ? {} : { email }),
@@ -510,7 +544,13 @@ function TastingPage() {
                   type="number"
                   min={1}
                   value={containerId}
-                  onChange={(e) => setContainerId(Number(e.target.value))}
+                  onChange={(e) => {
+                    setContainerId(
+                      e.target.value === '' ? '' : Number(e.target.value),
+                    );
+                    setContainerContext(null);
+                    setContextMessage(null);
+                  }}
                   required
                 />
               </div>
@@ -525,6 +565,56 @@ function TastingPage() {
                 />
               </div>
             </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={containerId === '' || contextLoading}
+                onClick={() => fetchContainerContext(containerId)}
+              >
+                {contextLoading ? 'Checking...' : 'Check Container'}
+              </Button>
+              <Message message={contextMessage} />
+            </div>
+
+            {containerContext && (
+              <div className="rounded-lg border border-input bg-muted/40 p-4 text-sm">
+                <h3 className="mb-2 font-medium">
+                  {`Container #${containerContext.container.id}`}
+                </h3>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-muted-foreground">Type</dt>
+                    <dd>{containerContext.container.container_type}</dd>
+                  </div>
+                  {containerContext.fermentation && (
+                    <div>
+                      <dt className="text-muted-foreground">Fermentation</dt>
+                      <dd>{`Fermentation #${containerContext.fermentation.id}`}</dd>
+                    </div>
+                  )}
+                  {containerContext.fermentation_log?.stage && (
+                    <div>
+                      <dt className="text-muted-foreground">Stage</dt>
+                      <dd>{`Stage: ${containerContext.fermentation_log.stage}`}</dd>
+                    </div>
+                  )}
+                  {containerContext.abv != null && (
+                    <div>
+                      <dt className="text-muted-foreground">ABV</dt>
+                      <dd>{`ABV: ${containerContext.abv.toFixed(2)}%`}</dd>
+                    </div>
+                  )}
+                  {containerContext.residual_sugar != null && (
+                    <div>
+                      <dt className="text-muted-foreground">Residual Sugar</dt>
+                      <dd>{`${containerContext.residual_sugar.toFixed(1)} g/L`}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            )}
 
             {RATING_FIELDS.map(({ key, label, low, high }) => (
               <div key={key} className="space-y-2">
@@ -558,7 +648,7 @@ function TastingPage() {
             <Message message={message} />
 
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || containerId === ''}>
                 {submitting ? 'Submitting...' : 'Submit Review'}
               </Button>
               {lastReview && (

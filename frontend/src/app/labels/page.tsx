@@ -24,7 +24,9 @@ export default function LabelsPage() {
 
   const [minId, setMinId] = useState(1);
   const [maxId, setMaxId] = useState(12);
+  const [nextLabelCount, setNextLabelCount] = useState(12);
   const [baseUrl, setBaseUrl] = useState('');
+  const [containers, setContainers] = useState<ContainerOut[]>([]);
   const [highestContainerId, setHighestContainerId] = useState<number | null>(null);
   const [loadingContainers, setLoadingContainers] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -50,6 +52,7 @@ export default function LabelsPage() {
     api.get<ContainerOut[]>('/api/containers?limit=500')
       .then((containers) => {
         if (cancelled) return;
+        setContainers(containers);
         if (containers.length === 0) {
           setHighestContainerId(null);
           return;
@@ -77,6 +80,23 @@ export default function LabelsPage() {
   const labelCount = maxId >= minId ? maxId - minId + 1 : 0;
   const isValidRange = minId >= 1 && maxId >= minId && labelCount <= 1000;
   const canGenerate = !generating && isValidRange;
+  const recentBottleIds = containers
+    .filter((container) => container.container_type === 'bottle')
+    .map((container) => container.id)
+    .sort((a, b) => a - b)
+    .slice(-12);
+
+  const useRecentBottles = () => {
+    if (recentBottleIds.length === 0) return;
+    setMinId(Math.min(...recentBottleIds));
+    setMaxId(Math.max(...recentBottleIds));
+  };
+
+  const useNextLabels = () => {
+    if (highestContainerId === null || nextLabelCount < 1) return;
+    setMinId(highestContainerId + 1);
+    setMaxId(highestContainerId + nextLabelCount);
+  };
 
   const handleGenerate = async () => {
     if (!isValidRange) {
@@ -172,7 +192,39 @@ export default function LabelsPage() {
                   {`Use 1-${highestContainerId}`}
                 </Button>
               )}
+              {recentBottleIds.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={useRecentBottles}
+                >
+                  Use recent bottles
+                </Button>
+              )}
             </div>
+            {highestContainerId !== null && (
+              <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="next_label_count">Next label count</Label>
+                  <Input
+                    id="next_label_count"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={nextLabelCount}
+                    onChange={(e) => setNextLabelCount(Number(e.target.value))}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={useNextLabels}
+                  disabled={nextLabelCount < 1 || nextLabelCount > 1000}
+                >
+                  Use next labels
+                </Button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="min_id">Min Container ID</Label>
