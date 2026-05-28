@@ -203,7 +203,7 @@ function VesselTab() {
   );
 }
 
-function BottleTab() {
+export function BottleTab() {
   const [dateAdded, setDateAdded] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -215,15 +215,17 @@ function BottleTab() {
     text: string;
   } | null>(null);
   const [bottles, setBottles] = useState<ContainerOut[]>([]);
+  const [nextContainerId, setNextContainerId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchBottles = async () => {
     try {
       setLoading(true);
-      const data = await api.get<ContainerOut[]>(
-        '/api/containers?container_type=bottle',
+      const data = await api.get<ContainerOut[]>('/api/containers?limit=500');
+      setBottles(data.filter((container) => container.container_type === 'bottle'));
+      setNextContainerId(
+        data.length > 0 ? Math.max(...data.map((container) => container.id)) + 1 : null,
       );
-      setBottles(data);
     } catch {
       // silently fail
     } finally {
@@ -240,13 +242,16 @@ function BottleTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/containers', {
+      const created = await api.post<ContainerOut>('/api/containers', {
         container_type: 'bottle',
         volume_liters: volume,
         empty_mass: emptyMass,
         date_added: dateAdded,
       });
-      setMessage({ type: 'success', text: 'Bottle added successfully!' });
+      setMessage({
+        type: 'success',
+        text: `Bottle created: Container ID ${created.id}. Label this bottle ${created.id}. Next bottle ID: ${created.id + 1}.`,
+      });
       fetchBottles();
     } catch (err) {
       setMessage({
@@ -266,6 +271,11 @@ function BottleTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {nextContainerId === null
+                ? 'Next bottle ID will be shown after bottles load.'
+                : `Next bottle ID should be ${nextContainerId}`}
+            </p>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="b_date">Date Added</Label>

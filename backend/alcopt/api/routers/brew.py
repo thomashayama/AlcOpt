@@ -351,12 +351,24 @@ def bottle(
     if body.from_container_id == body.to_container_id:
         raise HTTPException(400, "Source and destination must differ")
     _get_container(db, body.from_container_id)
-    _get_container(db, body.to_container_id)
+    to_container = _get_container(db, body.to_container_id)
 
     bottle_dt = _resolve_dt(body.at, body.date)
     source_log = current_fermentation_log(db, body.from_container_id, bottle_dt)
     if not source_log:
         raise HTTPException(400, "No active fermentation on source container")
+
+    amount = body.amount if body.amount is not None else 0.0
+    unit = body.unit
+    if body.filled_mass_g is not None:
+        if to_container.empty_mass is None:
+            raise HTTPException(400, "Target bottle does not have an empty mass")
+        amount = body.filled_mass_g - to_container.empty_mass
+        if amount <= 0:
+            raise HTTPException(
+                400, "Filled bottle mass must be greater than empty mass"
+            )
+        unit = "g"
 
     close_open_log(db, body.to_container_id, bottle_dt)
     db.flush()
@@ -366,14 +378,49 @@ def bottle(
         fermentation_id=source_log.fermentation_id,
         start_date=bottle_dt,
         source_container_id=body.from_container_id,
-        amount=body.amount,
-        unit=body.unit,
+        amount=amount,
+        unit=unit,
         stage="bottled",
     )
     db.add(log)
     _commit_or_conflict(db, "Another rack/bottle/start happened for this container")
     db.refresh(log)
     return log
+
+
+@router.post("/bottle/{log_id}/undo")
+def undo_bottle(
+    log_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    log = db.get(ContainerFermentationLog, log_id)
+    if not log:
+        raise HTTPException(404, f"Bottling log {log_id} not found")
+    if log.stage != "bottled":
+        raise HTTPException(400, f"Log {log_id} is not a bottling log")
+
+    current_log = current_fermentation_log(db, log.container_id)
+    if current_log is None or current_log.id != log.id:
+        raise HTTPException(409, "Only the current bottling log can be undone")
+
+    previous_log = (
+        db.query(ContainerFermentationLog)
+        .filter(
+            ContainerFermentationLog.container_id == log.container_id,
+            ContainerFermentationLog.id != log.id,
+            ContainerFermentationLog.end_date == log.start_date,
+        )
+        .order_by(ContainerFermentationLog.start_date.desc())
+        .first()
+    )
+
+    db.delete(log)
+    db.flush()
+    if previous_log is not None:
+        previous_log.end_date = None
+    db.commit()
+    return {"message": f"Bottling log {log_id} undone"}
 
 
 @router.post("/empty/{container_id}", response_model=EmptyContainerResponse)

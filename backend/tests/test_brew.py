@@ -380,6 +380,148 @@ def test_bottle(admin_client):
     db.close()
 
 
+def test_bottle_with_filled_mass_uses_bottle_empty_mass(admin_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    bottle = db.get(Container, 3)
+    bottle.empty_mass = 500.0
+    db.commit()
+    db.close()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "filled_mass_g": 842.5,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["container_id"] == 3
+    assert data["amount"] == 342.5
+    assert data["unit"] == "g"
+
+
+def test_bottle_with_filled_mass_requires_empty_mass(admin_client):
+    _seed_container_with_fermentation()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "filled_mass_g": 842.5,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "empty mass" in resp.json()["detail"]
+
+
+def test_bottle_with_filled_mass_must_exceed_empty_mass(admin_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    bottle = db.get(Container, 3)
+    bottle.empty_mass = 500.0
+    db.commit()
+    db.close()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "filled_mass_g": 499.9,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "greater than empty mass" in resp.json()["detail"]
+
+
+def test_undo_bottle_deletes_current_bottling_log(admin_client):
+    _seed_container_with_fermentation()
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "amount": 750.0,
+            "unit": "mL",
+        },
+    )
+    assert resp.status_code == 200
+    log_id = resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/bottle/{log_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(ContainerFermentationLog, log_id) is None
+    assert (
+        db.query(ContainerFermentationLog)
+        .filter_by(container_id=3, end_date=None)
+        .first()
+        is None
+    )
+    db.close()
+
+
+def test_undo_bottle_restores_previous_open_bottle_log(admin_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    db.add(Fermentation(id=2, start_date=date(2025, 2, 1)))
+    db.flush()
+    previous_log = ContainerFermentationLog(
+        container_id=3,
+        fermentation_id=2,
+        start_date=datetime(2025, 2, 1),
+        stage="bottled",
+    )
+    db.add(previous_log)
+    db.commit()
+    previous_log_id = previous_log.id
+    db.close()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "amount": 750.0,
+            "unit": "mL",
+        },
+    )
+    assert resp.status_code == 200
+    log_id = resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/bottle/{log_id}/undo")
+
+    assert undo.status_code == 200
+    db = TestSession()
+    restored_log = db.get(ContainerFermentationLog, previous_log_id)
+    assert restored_log.end_date is None
+    assert db.get(ContainerFermentationLog, log_id) is None
+    db.close()
+
+
+def test_undo_bottle_rejects_non_bottling_log(admin_client):
+    _seed_container_with_fermentation()
+
+    resp = admin_client.post("/api/brew/bottle/1/undo")
+
+    assert resp.status_code == 400
+    assert "bottling log" in resp.json()["detail"]
+
+
 def test_bottle_no_source_fermentation(admin_client):
     _seed_containers()
     resp = admin_client.post(
