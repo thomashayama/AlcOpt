@@ -194,9 +194,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">AlcOpt Dashboard</h1>
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-2 pb-8 sm:space-y-8 md:py-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold sm:text-3xl">AlcOpt Dashboard</h1>
         <Link href="/tasting">
           <Button>Submit Tasting</Button>
         </Link>
@@ -214,20 +214,29 @@ export default function HomePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">Rank</TableHead>
-                  <TableHead>Fermentation</TableHead>
+                  <TableHead className="w-10 sm:w-16">
+                    <span className="sm:hidden">#</span>
+                    <span className="hidden sm:inline">Rank</span>
+                  </TableHead>
+                  <TableHead>
+                    <span className="sm:hidden">Ferm.</span>
+                    <span className="hidden sm:inline">Fermentation</span>
+                  </TableHead>
                   <TableHead>Avg Rating</TableHead>
-                  <TableHead className="w-24 text-right">Reviews</TableHead>
+                  <TableHead className="text-right sm:w-24">Reviews</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {leaderboard.map((entry) => (
                   <TableRow key={entry.fermentation_id}>
                     <TableCell className="font-medium">{entry.rank}</TableCell>
-                    <TableCell>Fermentation #{entry.fermentation_id}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-2.5 w-32 rounded-full bg-muted overflow-hidden">
+                      <span className="hidden sm:inline">Fermentation </span>#
+                      {entry.fermentation_id}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="h-2.5 w-14 shrink-0 rounded-full sm:w-32 bg-muted overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
@@ -251,7 +260,7 @@ export default function HomePage() {
       </Card>
 
       {/* Charts grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Correlation Heatmap */}
         <Card>
           <CardHeader>
@@ -261,7 +270,7 @@ export default function HomePage() {
             {heatmapData.length === 0 ? (
               <p className="text-muted-foreground">Not enough reviews for correlation data.</p>
             ) : (
-              <div className="h-[400px]">
+              <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveHeatMap
                   data={heatmapData}
                   margin={{ top: 60, right: 30, bottom: 30, left: 80 }}
@@ -313,7 +322,7 @@ export default function HomePage() {
             {reviews.length === 0 ? (
               <p className="text-muted-foreground">No reviews yet.</p>
             ) : (
-              <div className="h-[400px]">
+              <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={ratingDistribution}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
@@ -357,7 +366,7 @@ export default function HomePage() {
             {abvScatter.length === 0 ? (
               <p className="text-muted-foreground">No ABV data available.</p>
             ) : (
-              <div className="h-[400px]">
+              <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
@@ -417,7 +426,7 @@ export default function HomePage() {
             {rsScatter.length === 0 ? (
               <p className="text-muted-foreground">No residual sugar data available.</p>
             ) : (
-              <div className="h-[400px]">
+              <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />

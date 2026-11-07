@@ -136,7 +136,7 @@ export function IngredientsTab() {
               <Label htmlFor="ingredient_select">Ingredient</Label>
               <select
                 id="ingredient_select"
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 value={selectedIngredient}
                 onChange={(e) => {
                   setSelectedIngredient(e.target.value);
@@ -164,12 +164,12 @@ export function IngredientsTab() {
                     <Input id="ing_sugar" type="number" step={0.01} value={sugarContent} onChange={(e) => setSugarContent(e.target.value === '' ? '' : Number(e.target.value))} />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="ing_type">Type</Label>
                     <select
                       id="ing_type"
-                      className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                       value={ingredientType}
                       onChange={(e) => setIngredientType(e.target.value)}
                     >
@@ -205,7 +205,7 @@ export function IngredientsTab() {
         <CardHeader><CardTitle>Add Ingredient to Container</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleAddAddition} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="add_container">Container ID</Label>
                 <Input id="add_container" type="number" min={1} value={addContainerId} onChange={(e) => setAddContainerId(Number(e.target.value))} required />
@@ -219,7 +219,7 @@ export function IngredientsTab() {
                 <Input id="add_date" type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} required />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="add_start">Starting Amount</Label>
                 <Input id="add_start" type="number" step={0.01} value={startingAmount} onChange={(e) => setStartingAmount(e.target.value === '' ? '' : Number(e.target.value))} />
@@ -249,7 +249,7 @@ export function IngredientsTab() {
           ) : additions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No additions found.</p>
           ) : (
-            <Table>
+            <Table stack>
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
@@ -264,13 +264,18 @@ export function IngredientsTab() {
               <TableBody>
                 {additions.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell>{a.id}</TableCell>
-                    <TableCell>{a.container_id}</TableCell>
-                    <TableCell>{a.ingredient_name ?? a.ingredient_id}</TableCell>
-                    <TableCell>{a.date}</TableCell>
-                    <TableCell>{a.starting_amount ?? '-'}</TableCell>
-                    <TableCell>{a.ending_amount ?? '-'}</TableCell>
-                    <TableCell>{a.unit ?? '-'}</TableCell>
+                    <TableCell data-label="ID">{a.id}</TableCell>
+                    <TableCell data-label="Container">{a.container_id}</TableCell>
+                    <TableCell
+                      data-label="Ingredient"
+                      className="max-sm:order-first max-sm:col-span-full max-sm:font-medium"
+                    >
+                      {a.ingredient_name ?? a.ingredient_id}
+                    </TableCell>
+                    <TableCell data-label="Date">{a.date}</TableCell>
+                    <TableCell data-label="Start Amt">{a.starting_amount ?? '-'}</TableCell>
+                    <TableCell data-label="End Amt">{a.ending_amount ?? '-'}</TableCell>
+                    <TableCell data-label="Unit">{a.unit ?? '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

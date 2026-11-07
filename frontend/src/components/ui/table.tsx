@@ -4,7 +4,19 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/**
+ * `stack`: below the `sm` breakpoint, each row renders as a small grid of
+ * labelled values instead of a wide table row, so tables with many columns
+ * fit a phone screen. Give every `TableCell` a `data-label`; `stack` sets
+ * the number of grid columns (default 3). See `[data-stack]` in globals.css.
+ */
+function Table({
+  className,
+  stack,
+  style,
+  ...props
+}: React.ComponentProps<"table"> & { stack?: boolean | number }) {
+  const stackCols = typeof stack === "number" ? stack : 3
   return (
     <div
       data-slot="table-container"
@@ -12,7 +24,13 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     >
       <table
         data-slot="table"
+        data-stack={stack ? "" : undefined}
         className={cn("w-full caption-bottom text-sm", className)}
+        style={
+          stack
+            ? ({ "--stack-cols": stackCols, ...style } as React.CSSProperties)
+            : style
+        }
         {...props}
       />
     </div>
@@ -70,7 +88,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+        "h-10 px-1.5 text-left align-middle font-medium whitespace-nowrap text-foreground sm:px-2 [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -83,7 +101,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "px-1.5 py-2 align-middle whitespace-nowrap sm:px-2 [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

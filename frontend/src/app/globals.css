@@ -128,3 +128,44 @@
     @apply font-sans;
   }
 }
+/*
+ * Stacked tables on phones (see the `stack` prop on <Table>).
+ * Each row becomes a grid of labelled values so wide tables fit the screen
+ * width instead of scrolling sideways. Unlayered on purpose so it wins over
+ * the cells' utility classes (whitespace-nowrap, padding).
+ */
+@media (width < 40rem) {
+  table[data-stack],
+  table[data-stack] > tbody {
+    display: block;
+  }
+  table[data-stack] > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  table[data-stack] > tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(var(--stack-cols, 3), minmax(0, 1fr));
+    gap: 0.625rem 0.75rem;
+    padding: 0.75rem 0.25rem;
+  }
+  table[data-stack] > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+  table[data-stack] > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--muted-foreground);
+  }
+}

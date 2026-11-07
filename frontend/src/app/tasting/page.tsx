@@ -385,16 +385,16 @@ function TastingPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-8">
+    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 pt-2 pb-8 sm:space-y-8 md:py-8">
       <Card>
         <CardHeader>
           <button
             type="button"
             onClick={() => setRubricOpen((o) => !o)}
-            className="flex w-full items-center justify-between text-left"
+            className="flex w-full items-center justify-between gap-3 text-left"
           >
             <CardTitle>Tasting Rubric</CardTitle>
-            <span className="text-muted-foreground text-sm">
+            <span className="shrink-0 text-muted-foreground text-sm">
               {rubricOpen ? '▲ Hide' : '▼ Show guide'}
             </span>
           </button>
@@ -426,7 +426,7 @@ function TastingPage() {
                         <span className="font-medium">{lvl.label}</span>
                       </div>
                       <p className="mb-1 text-sm">{lvl.detail}</p>
-                      <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
+                      <div className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
                         <p>
                           <span className="font-medium text-[#D4A24C]">
                             Wines:{' '}
@@ -507,7 +507,7 @@ function TastingPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="w-16 text-xs text-muted-foreground">
+                  <span className="w-12 shrink-0 text-xs text-muted-foreground sm:w-16">
                     {low}
                   </span>
                   <Slider
@@ -520,7 +520,7 @@ function TastingPage() {
                       setRatings((prev) => ({ ...prev, [key]: v }));
                     }}
                   />
-                  <span className="w-16 text-right text-xs text-muted-foreground">
+                  <span className="w-12 shrink-0 text-right text-xs text-muted-foreground sm:w-16">
                     {high}
                   </span>
                 </div>
@@ -539,7 +539,7 @@ function TastingPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting} className="h-10 w-full sm:h-8 sm:w-auto">
               {submitting ? 'Submitting...' : 'Submit Review'}
             </Button>
           </form>
@@ -557,7 +557,7 @@ function TastingPage() {
             ) : reviews.length === 0 ? (
               <p className="text-sm text-muted-foreground">No reviews yet.</p>
             ) : (
-              <Table>
+              <Table stack>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Container</TableHead>
@@ -573,14 +573,18 @@ function TastingPage() {
                 <TableBody>
                   {reviews.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell>{r.container_id}</TableCell>
-                      <TableCell>{r.review_date}</TableCell>
-                      <TableCell>{r.overall_rating.toFixed(1)}</TableCell>
-                      <TableCell>{r.boldness.toFixed(1)}</TableCell>
-                      <TableCell>{r.tannicity.toFixed(1)}</TableCell>
-                      <TableCell>{r.sweetness.toFixed(1)}</TableCell>
-                      <TableCell>{r.acidity.toFixed(1)}</TableCell>
-                      <TableCell>{r.complexity.toFixed(1)}</TableCell>
+                      <TableCell data-label="Container" className="max-sm:font-medium">
+                        {r.container_id}
+                      </TableCell>
+                      <TableCell data-label="Date" className="max-sm:col-span-2">
+                        {r.review_date}
+                      </TableCell>
+                      <TableCell data-label="Overall">{r.overall_rating.toFixed(1)}</TableCell>
+                      <TableCell data-label="Boldness">{r.boldness.toFixed(1)}</TableCell>
+                      <TableCell data-label="Tannicity">{r.tannicity.toFixed(1)}</TableCell>
+                      <TableCell data-label="Sweetness">{r.sweetness.toFixed(1)}</TableCell>
+                      <TableCell data-label="Acidity">{r.acidity.toFixed(1)}</TableCell>
+                      <TableCell data-label="Complexity">{r.complexity.toFixed(1)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -72,7 +72,7 @@ export function SgTab() {
         <CardHeader><CardTitle>Record SG Measurement</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="sg_container">Container ID</Label>
                 <Input id="sg_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} required />
@@ -106,7 +106,10 @@ export function SgTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Fermentation</TableHead>
+                  <TableHead>
+                    <span className="sm:hidden">Ferm.</span>
+                    <span className="hidden sm:inline">Fermentation</span>
+                  </TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>SG</TableHead>
                 </TableRow>

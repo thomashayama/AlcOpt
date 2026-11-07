@@ -110,7 +110,7 @@ export function RackTab() {
           ) : logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No logs found.</p>
           ) : (
-            <Table>
+            <Table stack>
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
@@ -125,13 +125,13 @@ export function RackTab() {
               <TableBody>
                 {logs.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell>{l.id}</TableCell>
-                    <TableCell>{l.container_id}</TableCell>
-                    <TableCell>{l.fermentation_id}</TableCell>
-                    <TableCell>{l.start_date}</TableCell>
-                    <TableCell>{l.end_date ?? '-'}</TableCell>
-                    <TableCell>{l.stage ?? '-'}</TableCell>
-                    <TableCell>{l.source_container_id ?? '-'}</TableCell>
+                    <TableCell data-label="ID">{l.id}</TableCell>
+                    <TableCell data-label="Container">{l.container_id}</TableCell>
+                    <TableCell data-label="Fermentation">{l.fermentation_id}</TableCell>
+                    <TableCell data-label="Start">{l.start_date}</TableCell>
+                    <TableCell data-label="End">{l.end_date ?? '-'}</TableCell>
+                    <TableCell data-label="Stage">{l.stage ?? '-'}</TableCell>
+                    <TableCell data-label="Source">{l.source_container_id ?? '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

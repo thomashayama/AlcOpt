@@ -72,7 +72,7 @@ export function MassTab() {
         <CardHeader><CardTitle>Record Mass Measurement</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="mass_container">Container ID</Label>
                 <Input id="mass_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} required />
@@ -106,7 +106,10 @@ export function MassTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Fermentation</TableHead>
+                  <TableHead>
+                    <span className="sm:hidden">Ferm.</span>
+                    <span className="hidden sm:inline">Fermentation</span>
+                  </TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Mass (g)</TableHead>
                 </TableRow>

@@ -72,7 +72,7 @@ export function StartTab() {
         <CardHeader><CardTitle>Start Fermentation</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="s_container">Container ID</Label>
                 <Input id="s_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} required />
@@ -102,7 +102,7 @@ export function StartTab() {
           ) : logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No logs found.</p>
           ) : (
-            <Table>
+            <Table stack>
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
@@ -116,12 +116,12 @@ export function StartTab() {
               <TableBody>
                 {logs.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell>{l.id}</TableCell>
-                    <TableCell>{l.container_id}</TableCell>
-                    <TableCell>{l.fermentation_id}</TableCell>
-                    <TableCell>{l.start_date}</TableCell>
-                    <TableCell>{l.end_date ?? '-'}</TableCell>
-                    <TableCell>{l.stage ?? '-'}</TableCell>
+                    <TableCell data-label="ID">{l.id}</TableCell>
+                    <TableCell data-label="Container">{l.container_id}</TableCell>
+                    <TableCell data-label="Fermentation">{l.fermentation_id}</TableCell>
+                    <TableCell data-label="Start">{l.start_date}</TableCell>
+                    <TableCell data-label="End">{l.end_date ?? '-'}</TableCell>
+                    <TableCell data-label="Stage">{l.stage ?? '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -111,7 +111,7 @@ function VesselTab() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="v_volume">Volume (L)</Label>
                 <Input
@@ -172,7 +172,7 @@ function VesselTab() {
           ) : vessels.length === 0 ? (
             <p className="text-sm text-muted-foreground">No vessels found.</p>
           ) : (
-            <Table>
+            <Table stack>
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
@@ -186,12 +186,12 @@ function VesselTab() {
               <TableBody>
                 {vessels.map((v) => (
                   <TableRow key={v.id}>
-                    <TableCell>{v.id}</TableCell>
-                    <TableCell>{v.container_type}</TableCell>
-                    <TableCell>{v.material ?? '-'}</TableCell>
-                    <TableCell>{v.volume_liters ?? '-'}</TableCell>
-                    <TableCell>{v.empty_mass ?? '-'}</TableCell>
-                    <TableCell>{v.date_added ?? '-'}</TableCell>
+                    <TableCell data-label="ID" className="max-sm:font-medium">{v.id}</TableCell>
+                    <TableCell data-label="Type">{v.container_type}</TableCell>
+                    <TableCell data-label="Material">{v.material ?? '-'}</TableCell>
+                    <TableCell data-label="Volume (L)">{v.volume_liters ?? '-'}</TableCell>
+                    <TableCell data-label="Empty Mass (g)">{v.empty_mass ?? '-'}</TableCell>
+                    <TableCell data-label="Date Added">{v.date_added ?? '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -266,7 +266,7 @@ function BottleTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="b_date">Date Added</Label>
                 <Input
@@ -332,9 +332,18 @@ function BottleTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Volume (L)</TableHead>
-                  <TableHead>Empty Mass (g)</TableHead>
-                  <TableHead>Date Added</TableHead>
+                  <TableHead>
+                    <span className="sm:hidden">Vol (L)</span>
+                    <span className="hidden sm:inline">Volume (L)</span>
+                  </TableHead>
+                  <TableHead>
+                    <span className="sm:hidden">Mass (g)</span>
+                    <span className="hidden sm:inline">Empty Mass (g)</span>
+                  </TableHead>
+                  <TableHead>
+                    <span className="sm:hidden">Added</span>
+                    <span className="hidden sm:inline">Date Added</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,7 +385,7 @@ export default function BottlesPage() {
   if (!user || !user.is_admin) return null;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-8 md:py-8">
       <h1 className="text-2xl font-semibold">Bottle Log</h1>
       <Tabs defaultValue={0}>
         <TabsList>

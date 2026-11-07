@@ -34,14 +34,18 @@ export default function BrewPage() {
   if (!user || !user.is_admin) return null;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-8 md:py-8">
       <h1 className="text-2xl font-semibold">Brew Log</h1>
       <Tabs defaultValue={0}>
-        <TabsList className="flex-wrap">
+        <TabsList className="w-full flex-wrap group-data-horizontal/tabs:h-auto *:h-8 sm:w-fit">
           <TabsTrigger value={0}>Start</TabsTrigger>
           <TabsTrigger value={1}>Ingredients</TabsTrigger>
-          <TabsTrigger value={2}>SG Measurements</TabsTrigger>
-          <TabsTrigger value={3}>Mass Measurements</TabsTrigger>
+          <TabsTrigger value={2}>
+            SG<span className="hidden sm:inline">&nbsp;Measurements</span>
+          </TabsTrigger>
+          <TabsTrigger value={3}>
+            Mass<span className="hidden sm:inline">&nbsp;Measurements</span>
+          </TabsTrigger>
           <TabsTrigger value={4}>Rack</TabsTrigger>
           <TabsTrigger value={5}>Bottle</TabsTrigger>
           <TabsTrigger value={6}>Calculator</TabsTrigger>

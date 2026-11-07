@@ -151,7 +151,7 @@ export function CalculatorTab() {
             {result && (
               <div className="rounded-lg border border-input bg-muted/50 p-4 space-y-2">
                 <h3 className="font-medium">Results</h3>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
                   <div>
                     <p className="text-muted-foreground">Max ABV</p>
                     <p className="text-lg font-semibold">

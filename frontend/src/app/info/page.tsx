@@ -97,8 +97,8 @@ function InfoPage() {
   const ingredients = data?.ingredients ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-8">
-      <h1 className="text-3xl font-bold">Container Information</h1>
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-8 sm:space-y-8 md:py-8">
+      <h1 className="text-2xl font-bold sm:text-3xl">Container Information</h1>
 
       {/* Lookup form */}
       <form onSubmit={handleSubmit} className="flex items-end justify-center gap-4">
@@ -129,8 +129,8 @@ function InfoPage() {
 
       {data && (
         <>
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Container #{data.container.id}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-bold sm:text-2xl">Container #{data.container.id}</h2>
             <Link href={`/tasting?container_id=${data.container.id}`}>
               <Button>Submit Review</Button>
             </Link>
@@ -217,7 +217,7 @@ function InfoPage() {
                 <CardTitle>Specific Gravity &amp; ABV over Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={sgChartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
@@ -298,18 +298,21 @@ function InfoPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ingredient</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Days from Start</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">
+                        <span className="sm:hidden">Day</span>
+                        <span className="hidden sm:inline">Days from Start</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {ingredients.map((ing, i) => (
                       <TableRow key={i}>
-                        <TableCell>{ing.ingredient ?? '-'}</TableCell>
-                        <TableCell>{ing.amount ?? '-'}</TableCell>
-                        <TableCell>{ing.unit ?? '-'}</TableCell>
-                        <TableCell>{ing.days_from_start ?? '-'}</TableCell>
+                        <TableCell className="whitespace-normal">{ing.ingredient ?? '-'}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {ing.amount != null ? `${ing.amount}${ing.unit ? ` ${ing.unit}` : ''}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{ing.days_from_start ?? '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -325,7 +328,7 @@ function InfoPage() {
                 <CardTitle>Reviews</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
+                <Table stack>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
@@ -340,13 +343,15 @@ function InfoPage() {
                   <TableBody>
                     {data.reviews.map((review) => (
                       <TableRow key={review.id}>
-                        <TableCell>{review.review_date}</TableCell>
-                        <TableCell>{review.overall_rating}</TableCell>
-                        <TableCell>{review.boldness}</TableCell>
-                        <TableCell>{review.tannicity}</TableCell>
-                        <TableCell>{review.sweetness}</TableCell>
-                        <TableCell>{review.acidity}</TableCell>
-                        <TableCell>{review.complexity}</TableCell>
+                        <TableCell className="max-sm:col-span-full max-sm:font-medium">
+                          {review.review_date}
+                        </TableCell>
+                        <TableCell data-label="Overall">{review.overall_rating}</TableCell>
+                        <TableCell data-label="Boldness">{review.boldness}</TableCell>
+                        <TableCell data-label="Tannicity">{review.tannicity}</TableCell>
+                        <TableCell data-label="Sweetness">{review.sweetness}</TableCell>
+                        <TableCell data-label="Acidity">{review.acidity}</TableCell>
+                        <TableCell data-label="Complexity">{review.complexity}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

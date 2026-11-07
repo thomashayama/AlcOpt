@@ -73,7 +73,7 @@ export function BottleTab() {
         <CardHeader><CardTitle>Bottle</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="bot_from">From Container ID (vessel)</Label>
                 <Input id="bot_from" type="number" min={1} value={fromContainerId} onChange={(e) => setFromContainerId(Number(e.target.value))} required />
@@ -83,7 +83,7 @@ export function BottleTab() {
                 <Input id="bot_to" type="number" min={1} value={toContainerId} onChange={(e) => setToContainerId(Number(e.target.value))} required />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="bot_date">Date</Label>
                 <Input id="bot_date" type="date" value={bottleDate} onChange={(e) => setBottleDate(e.target.value)} required />
@@ -109,7 +109,7 @@ export function BottleTab() {
         <CardHeader><CardTitle>Empty Container</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-end gap-4">
-            <div className="space-y-2">
+            <div className="min-w-0 flex-1 space-y-2 sm:flex-none">
               <Label htmlFor="empty_id">Container ID</Label>
               <Input id="empty_id" type="number" min={1} value={emptyContainerId} onChange={(e) => setEmptyContainerId(Number(e.target.value))} />
             </div>
