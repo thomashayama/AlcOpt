@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
 import type { ContainerOut } from '@/lib/types';
+import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,10 +25,61 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
+const selectClassName = 'flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm';
+
+const VESSEL_PRESETS = [
+  {
+    id: 'glass-2l-carboy',
+    label: '2 L glass carboy',
+    containerType: 'carboy',
+    material: 'Glass',
+    volume: 2,
+    emptyMass: 792,
+  },
+  {
+    id: 'glass-1gal-jug',
+    label: '1 gal glass jug',
+    containerType: 'carboy',
+    material: 'Glass',
+    volume: 3.8,
+    emptyMass: 1500,
+  },
+  {
+    id: 'plastic-bucket',
+    label: 'Plastic bucket',
+    containerType: 'bucket',
+    material: 'Plastic',
+    volume: 7.5,
+    emptyMass: 650,
+  },
+] as const;
+
+const BOTTLE_PRESETS = [
+  {
+    id: '500ml-bottle',
+    label: '500 mL bottle',
+    volume: 0.5,
+    emptyMass: 500,
+  },
+  {
+    id: '750ml-wine-bottle',
+    label: '750 mL wine bottle',
+    volume: 0.75,
+    emptyMass: 500,
+  },
+  {
+    id: '375ml-half-bottle',
+    label: '375 mL half bottle',
+    volume: 0.375,
+    emptyMass: 320,
+  },
+] as const;
+
 function VesselTab() {
   const [dateAdded, setDateAdded] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const [vesselPreset, setVesselPreset] = useState<string>(VESSEL_PRESETS[0].id);
   const [material, setMaterial] = useState('Glass');
   const [volume, setVolume] = useState(2.0);
   const [emptyMass, setEmptyMass] = useState(792.0);
@@ -47,8 +99,11 @@ function VesselTab() {
         '/api/containers?container_type=carboy',
       );
       setVessels(data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to load vessels',
+      });
     } finally {
       setLoading(false);
     }
@@ -58,19 +113,32 @@ function VesselTab() {
     fetchVessels();
   }, []);
 
+  const applyVesselPreset = (presetId: string) => {
+    setVesselPreset(presetId);
+    const preset = VESSEL_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setMaterial(preset.material);
+    setVolume(preset.volume);
+    setEmptyMass(preset.emptyMass);
+    setContainerType(preset.containerType);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/containers', {
+      const created = await api.post<ContainerOut>('/api/containers', {
         container_type: containerType,
         volume_liters: volume,
         material,
         empty_mass: emptyMass,
         date_added: dateAdded,
       });
-      setMessage({ type: 'success', text: 'Vessel added successfully!' });
+      setMessage({
+        type: 'success',
+        text: `Vessel created: Container ID ${created.id}. Label this vessel ${created.id}.`,
+      });
       fetchVessels();
     } catch (err) {
       setMessage({
@@ -90,6 +158,21 @@ function VesselTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="v_preset">Vessel Preset</Label>
+              <select
+                id="v_preset"
+                className={selectClassName}
+                value={vesselPreset}
+                onChange={(e) => applyVesselPreset(e.target.value)}
+              >
+                {VESSEL_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="v_date">Date Added</Label>
@@ -103,12 +186,17 @@ function VesselTab() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="v_material">Material</Label>
-                <Input
+                <select
                   id="v_material"
-                  type="text"
+                  className={selectClassName}
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
-                />
+                >
+                  <option value="Glass">Glass</option>
+                  <option value="Plastic">Plastic</option>
+                  <option value="Stainless">Stainless</option>
+                  <option value="Ceramic">Ceramic</option>
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -134,26 +222,21 @@ function VesselTab() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="v_type">Type</Label>
-                <Input
+                <select
                   id="v_type"
-                  type="text"
+                  className={selectClassName}
                   value={containerType}
                   onChange={(e) => setContainerType(e.target.value)}
-                />
+                >
+                  <option value="carboy">carboy</option>
+                  <option value="bucket">bucket</option>
+                  <option value="demijohn">demijohn</option>
+                  <option value="tank">tank</option>
+                </select>
               </div>
             </div>
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Adding...' : 'Add Vessel'}
@@ -203,10 +286,11 @@ function VesselTab() {
   );
 }
 
-function BottleTab() {
+export function BottleTab() {
   const [dateAdded, setDateAdded] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const [bottlePreset, setBottlePreset] = useState<string>(BOTTLE_PRESETS[0].id);
   const [volume, setVolume] = useState(0.5);
   const [emptyMass, setEmptyMass] = useState(500.0);
   const [submitting, setSubmitting] = useState(false);
@@ -215,17 +299,22 @@ function BottleTab() {
     text: string;
   } | null>(null);
   const [bottles, setBottles] = useState<ContainerOut[]>([]);
+  const [nextContainerId, setNextContainerId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchBottles = async () => {
     try {
       setLoading(true);
-      const data = await api.get<ContainerOut[]>(
-        '/api/containers?container_type=bottle',
+      const data = await api.get<ContainerOut[]>('/api/containers?limit=500');
+      setBottles(data.filter((container) => container.container_type === 'bottle'));
+      setNextContainerId(
+        data.length > 0 ? Math.max(...data.map((container) => container.id)) + 1 : null,
       );
-      setBottles(data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to load bottles',
+      });
     } finally {
       setLoading(false);
     }
@@ -235,18 +324,29 @@ function BottleTab() {
     fetchBottles();
   }, []);
 
+  const applyBottlePreset = (presetId: string) => {
+    setBottlePreset(presetId);
+    const preset = BOTTLE_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setVolume(preset.volume);
+    setEmptyMass(preset.emptyMass);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/containers', {
+      const created = await api.post<ContainerOut>('/api/containers', {
         container_type: 'bottle',
         volume_liters: volume,
         empty_mass: emptyMass,
         date_added: dateAdded,
       });
-      setMessage({ type: 'success', text: 'Bottle added successfully!' });
+      setMessage({
+        type: 'success',
+        text: `Bottle created: Container ID ${created.id}. Label this bottle ${created.id}. Next bottle ID: ${created.id + 1}.`,
+      });
       fetchBottles();
     } catch (err) {
       setMessage({
@@ -266,6 +366,26 @@ function BottleTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {nextContainerId === null
+                ? 'Next bottle ID will be shown after bottles load.'
+                : `Next bottle ID should be ${nextContainerId}`}
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="b_preset">Bottle Preset</Label>
+              <select
+                id="b_preset"
+                className={selectClassName}
+                value={bottlePreset}
+                onChange={(e) => applyBottlePreset(e.target.value)}
+              >
+                {BOTTLE_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="b_date">Date Added</Label>
@@ -299,17 +419,7 @@ function BottleTab() {
               </div>
             </div>
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Adding...' : 'Add Bottle'}

@@ -102,6 +102,8 @@ def test_analytics_reviews_with_data(client):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
+    assert data[0]["id"] is not None
+    assert data[0]["fermentation_id"] == 1
     assert data[0]["overall_rating"] == 4.0
 
 

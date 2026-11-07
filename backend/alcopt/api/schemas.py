@@ -187,8 +187,9 @@ class BottleRequest(BaseModel):
     to_container_id: int
     date: date
     at: datetime | None = None
-    amount: float = 0.0
+    amount: float | None = None
     unit: str = "g"
+    filled_mass_g: float | None = Field(default=None, gt=0)
 
     @field_validator("unit")
     @classmethod

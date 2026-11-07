@@ -13,10 +13,14 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  ActiveFermentationSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 export function RackTab() {
-  const [fromContainerId, setFromContainerId] = useState(1);
-  const [toContainerId, setToContainerId] = useState(1);
+  const [fromContainerId, setFromContainerId] = useState<ContainerIdValue>('');
+  const [toContainerId, setToContainerId] = useState<ContainerIdValue>('');
   const [rackDate, setRackDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -50,13 +54,16 @@ export function RackTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/brew/rack', {
-        from_container_id: fromContainerId,
-        to_container_id: toContainerId,
+      const log = await api.post<ContainerLogOut>('/api/brew/rack', {
+        from_container_id: Number(fromContainerId),
+        to_container_id: Number(toContainerId),
         date: rackDate,
         stage,
       });
-      setMessage({ type: 'success', text: 'Racking recorded!' });
+      setMessage({
+        type: 'success',
+        text: `Rack recorded: fermentation ${log.fermentation_id} moved from container ${log.source_container_id ?? fromContainerId} to ${log.container_id} (log ${log.id}).`,
+      });
       fetchLogs();
     } catch (err) {
       setMessage({
@@ -74,14 +81,33 @@ export function RackTab() {
         <CardHeader><CardTitle>Rack</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <ActiveFermentationSelect
+              id="rack_active_fermentation"
+              value={fromContainerId}
+              onChange={setFromContainerId}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="rack_from">From Container ID</Label>
-                <Input id="rack_from" type="number" min={1} value={fromContainerId} onChange={(e) => setFromContainerId(Number(e.target.value))} required />
+                <Input
+                  id="rack_from"
+                  type="number"
+                  min={1}
+                  value={fromContainerId}
+                  onChange={(e) => setFromContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rack_to">To Container ID</Label>
-                <Input id="rack_to" type="number" min={1} value={toContainerId} onChange={(e) => setToContainerId(Number(e.target.value))} required />
+                <Input
+                  id="rack_to"
+                  type="number"
+                  min={1}
+                  value={toContainerId}
+                  onChange={(e) => setToContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -95,7 +121,7 @@ export function RackTab() {
               </div>
             </div>
             <Message message={message} />
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || fromContainerId === '' || toContainerId === ''}>
               {submitting ? 'Recording...' : 'Record Racking'}
             </Button>
           </form>

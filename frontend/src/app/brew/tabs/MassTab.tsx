@@ -13,9 +13,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  ActiveFermentationSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
 
 export function MassTab() {
-  const [containerId, setContainerId] = useState(1);
+  const [containerId, setContainerId] = useState<ContainerIdValue>('');
   const [measurementDate, setMeasurementDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -27,6 +31,10 @@ export function MassTab() {
   } | null>(null);
   const [measurements, setMeasurements] = useState<MassMeasurementOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastMeasurement, setLastMeasurement] = useState<MassMeasurementOut | null>(
+    null,
+  );
+  const [undoing, setUndoing] = useState(false);
 
   const fetchMeasurements = async () => {
     try {
@@ -49,12 +57,16 @@ export function MassTab() {
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/brew/mass-measurements', {
-        container_id: containerId,
+      const measurement = await api.post<MassMeasurementOut>('/api/brew/mass-measurements', {
+        container_id: Number(containerId),
         measurement_date: measurementDate,
         mass,
       });
-      setMessage({ type: 'success', text: 'Mass measurement recorded!' });
+      setLastMeasurement(measurement);
+      setMessage({
+        type: 'success',
+        text: `Mass measurement ${measurement.id} recorded for fermentation ${measurement.fermentation_id}: ${measurement.mass}g.`,
+      });
       fetchMeasurements();
     } catch (err) {
       setMessage({
@@ -66,16 +78,49 @@ export function MassTab() {
     }
   };
 
+  const handleUndo = async () => {
+    if (!lastMeasurement) return;
+    setUndoing(true);
+    setMessage(null);
+    try {
+      const result = await api.post<{ message: string }>(
+        `/api/brew/mass-measurements/${lastMeasurement.id}/undo`,
+      );
+      setLastMeasurement(null);
+      setMessage({ type: 'success', text: result.message });
+      fetchMeasurements();
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to undo measurement',
+      });
+    } finally {
+      setUndoing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader><CardTitle>Record Mass Measurement</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <ActiveFermentationSelect
+              id="mass_active_fermentation"
+              value={containerId}
+              onChange={setContainerId}
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="mass_container">Container ID</Label>
-                <Input id="mass_container" type="number" min={1} value={containerId} onChange={(e) => setContainerId(Number(e.target.value))} required />
+                <Input
+                  id="mass_container"
+                  type="number"
+                  min={1}
+                  value={containerId}
+                  onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mass_date">Measurement Date</Label>
@@ -87,9 +132,21 @@ export function MassTab() {
               </div>
             </div>
             <Message message={message} />
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Recording...' : 'Record Measurement'}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" disabled={submitting || containerId === ''}>
+                {submitting ? 'Recording...' : 'Record Measurement'}
+              </Button>
+              {lastMeasurement && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleUndo}
+                  disabled={undoing}
+                >
+                  {undoing ? 'Undoing...' : 'Undo Last Mass Measurement'}
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>

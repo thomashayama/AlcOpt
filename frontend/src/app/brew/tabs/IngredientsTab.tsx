@@ -13,6 +13,23 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  ActiveFermentationSelect,
+  UnitSelect,
+  type ContainerIdValue,
+} from './brewFormHelpers';
+
+interface IngredientAdditionResponse {
+  id: number;
+  fermentation_id?: number | null;
+  message: string;
+}
+
+function formatAmount(value: number) {
+  return Number.isInteger(value)
+    ? value.toFixed(0)
+    : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
 
 export function IngredientsTab() {
   const [ingredients, setIngredients] = useState<IngredientOut[]>([]);
@@ -30,7 +47,7 @@ export function IngredientsTab() {
     text: string;
   } | null>(null);
 
-  const [addContainerId, setAddContainerId] = useState(1);
+  const [addContainerId, setAddContainerId] = useState<ContainerIdValue>('');
   const [addIngredientName, setAddIngredientName] = useState('');
   const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
   const [startingAmount, setStartingAmount] = useState<number | ''>('');
@@ -44,6 +61,10 @@ export function IngredientsTab() {
 
   const [additions, setAdditions] = useState<AdditionOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastAddition, setLastAddition] = useState<IngredientAdditionResponse | null>(
+    null,
+  );
+  const [undoingAddition, setUndoingAddition] = useState(false);
 
   const fetchIngredients = async () => {
     try {
@@ -76,21 +97,29 @@ export function IngredientsTab() {
     setCreatingIngredient(true);
     setCreateMessage(null);
     try {
-      await api.post('/api/brew/ingredients', {
+      const ingredient = await api.post<IngredientOut>('/api/brew/ingredients', {
         name: newName,
-        sugar_content: sugarContent === '' ? null : sugarContent,
+        sugar_content: sugarContent === '' ? 0 : sugarContent,
         ingredient_type: ingredientType,
-        density: density === '' ? null : density,
-        price: price === '' ? null : price,
-        notes: notes || null,
+        density: density === '' ? 1 : density,
+        price: price === '' ? 0 : price,
+        notes,
       });
-      setCreateMessage({ type: 'success', text: 'Ingredient created successfully!' });
+      setIngredients((prev) => [
+        ...prev.filter((existing) => existing.id !== ingredient.id),
+        ingredient,
+      ].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedIngredient(ingredient.name);
+      setAddIngredientName(ingredient.name);
+      setCreateMessage({
+        type: 'success',
+        text: `Ingredient ${ingredient.id} created: ${ingredient.name}. It is selected below.`,
+      });
       setNewName('');
       setSugarContent('');
       setDensity('');
       setPrice('');
       setNotes('');
-      fetchIngredients();
     } catch (err) {
       setCreateMessage({
         type: 'error',
@@ -106,15 +135,22 @@ export function IngredientsTab() {
     setAddingAddition(true);
     setAddMessage(null);
     try {
-      await api.post('/api/brew/additions', {
-        container_id: addContainerId,
+      const startValue = startingAmount === '' ? 0 : startingAmount;
+      const endValue = endingAmount === '' ? 0 : endingAmount;
+      const amount = endValue - startValue;
+      const result = await api.post<IngredientAdditionResponse>('/api/brew/additions', {
+        container_id: Number(addContainerId),
         ingredient_name: addIngredientName,
         date: addDate,
-        starting_amount: startingAmount === '' ? null : startingAmount,
-        ending_amount: endingAmount === '' ? null : endingAmount,
+        starting_amount: startValue,
+        ending_amount: endValue,
         unit: addUnit,
       });
-      setAddMessage({ type: 'success', text: 'Addition recorded!' });
+      setLastAddition(result);
+      setAddMessage({
+        type: 'success',
+        text: `Addition ${result.id} recorded for container ${Number(addContainerId)}: ${addIngredientName} ${formatAmount(amount)} ${addUnit} (${result.fermentation_id == null ? 'no active fermentation' : `fermentation ${result.fermentation_id}`}).`,
+      });
       fetchAdditions();
     } catch (err) {
       setAddMessage({
@@ -125,6 +161,32 @@ export function IngredientsTab() {
       setAddingAddition(false);
     }
   };
+
+  const handleUndoAddition = async () => {
+    if (!lastAddition) return;
+    setUndoingAddition(true);
+    setAddMessage(null);
+    try {
+      const result = await api.post<{ message: string }>(
+        `/api/brew/additions/${lastAddition.id}/undo`,
+      );
+      setLastAddition(null);
+      setAddMessage({ type: 'success', text: result.message });
+      fetchAdditions();
+    } catch (err) {
+      setAddMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to undo addition',
+      });
+    } finally {
+      setUndoingAddition(false);
+    }
+  };
+
+  const calculatedAdditionAmount =
+    startingAmount !== '' && endingAmount !== ''
+      ? endingAmount - startingAmount
+      : null;
 
   return (
     <div className="space-y-6">
@@ -191,12 +253,12 @@ export function IngredientsTab() {
                   <Label htmlFor="ing_notes">Notes</Label>
                   <Input id="ing_notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
-                <Message message={createMessage} />
                 <Button type="submit" disabled={creatingIngredient}>
                   {creatingIngredient ? 'Creating...' : 'Create Ingredient'}
                 </Button>
               </form>
             )}
+            <Message message={createMessage} />
           </div>
         </CardContent>
       </Card>
@@ -205,10 +267,22 @@ export function IngredientsTab() {
         <CardHeader><CardTitle>Add Ingredient to Container</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleAddAddition} className="space-y-4">
+            <ActiveFermentationSelect
+              id="add_active_fermentation"
+              value={addContainerId}
+              onChange={setAddContainerId}
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="add_container">Container ID</Label>
-                <Input id="add_container" type="number" min={1} value={addContainerId} onChange={(e) => setAddContainerId(Number(e.target.value))} required />
+                <Input
+                  id="add_container"
+                  type="number"
+                  min={1}
+                  value={addContainerId}
+                  onChange={(e) => setAddContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="add_ingredient">Ingredient Name</Label>
@@ -228,15 +302,34 @@ export function IngredientsTab() {
                 <Label htmlFor="add_end">Ending Amount</Label>
                 <Input id="add_end" type="number" step={0.01} value={endingAmount} onChange={(e) => setEndingAmount(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="add_unit">Unit</Label>
-                <Input id="add_unit" type="text" value={addUnit} onChange={(e) => setAddUnit(e.target.value)} />
-              </div>
+              <UnitSelect
+                id="add_unit"
+                label="Unit"
+                value={addUnit}
+                onChange={setAddUnit}
+              />
             </div>
+            {calculatedAdditionAmount !== null && (
+              <p className="text-sm text-muted-foreground">
+                {`${formatAmount(endingAmount as number)} - ${formatAmount(startingAmount as number)} = ${formatAmount(calculatedAdditionAmount)} ${addUnit} amount change`}
+              </p>
+            )}
             <Message message={addMessage} />
-            <Button type="submit" disabled={addingAddition}>
-              {addingAddition ? 'Adding...' : 'Add to Container'}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" disabled={addingAddition || addContainerId === ''}>
+                {addingAddition ? 'Adding...' : 'Add to Container'}
+              </Button>
+              {lastAddition && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleUndoAddition}
+                  disabled={undoingAddition}
+                >
+                  {undoingAddition ? 'Undoing...' : 'Undo Last Addition'}
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -256,8 +349,7 @@ export function IngredientsTab() {
                   <TableHead>Container</TableHead>
                   <TableHead>Ingredient</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Start Amt</TableHead>
-                  <TableHead>End Amt</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead>Unit</TableHead>
                 </TableRow>
               </TableHeader>
@@ -272,9 +364,8 @@ export function IngredientsTab() {
                     >
                       {a.ingredient_name ?? a.ingredient_id}
                     </TableCell>
-                    <TableCell data-label="Date">{a.date}</TableCell>
-                    <TableCell data-label="Start Amt">{a.starting_amount ?? '-'}</TableCell>
-                    <TableCell data-label="End Amt">{a.ending_amount ?? '-'}</TableCell>
+                    <TableCell data-label="Date">{a.added_at?.slice(0, 10) ?? '-'}</TableCell>
+                    <TableCell data-label="Amount">{a.amount ?? '-'}</TableCell>
                     <TableCell data-label="Unit">{a.unit ?? '-'}</TableCell>
                   </TableRow>
                 ))}

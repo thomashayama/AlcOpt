@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from unum import units
 
 from alcopt.api.dependencies import get_db, require_admin
 from alcopt.api.schemas import (
@@ -13,6 +14,7 @@ from alcopt.api.schemas import (
     FermentationActiveOut,
     FermentationEndRequest,
     FermentationOut,
+    IngredientAdditionOut,
     IngredientAdditionCreate,
     IngredientAdditionResponse,
     IngredientCreate,
@@ -37,14 +39,13 @@ from alcopt.database.models import (
 from alcopt.database.utils import close_open_log, current_fermentation_log
 from alcopt.streamlit_utils import (
     all_container_log_info,
-    all_ingredient_additions_info,
     all_sg_measurement_info,
 )
-from alcopt.database.utils import all_mass_measurement_info
 from alcopt.utils import (
     BENCHMARK,
     YEAST,
     calculate_max_potential_abv,
+    mL,
     str2unit,
 )
 
@@ -238,12 +239,45 @@ def add_ingredient_addition(
     }
 
 
-@router.get("/additions")
+@router.get("/additions", response_model=list[IngredientAdditionOut])
 def list_additions(
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
-    return all_ingredient_additions_info(db)
+    additions = (
+        db.query(IngredientAddition)
+        .join(Ingredient, Ingredient.id == IngredientAddition.ingredient_id)
+        .order_by(IngredientAddition.added_at, IngredientAddition.id)
+        .all()
+    )
+    return [
+        IngredientAdditionOut(
+            id=addition.id,
+            container_id=addition.container_id,
+            ingredient_id=addition.ingredient_id,
+            added_at=addition.added_at,
+            amount=addition.amount,
+            unit=addition.unit,
+            notes=addition.notes,
+            ingredient_name=addition.ingredient.name if addition.ingredient else None,
+        )
+        for addition in additions
+    ]
+
+
+@router.post("/additions/{addition_id}/undo")
+def undo_ingredient_addition(
+    addition_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    addition = db.get(IngredientAddition, addition_id)
+    if not addition:
+        raise HTTPException(404, f"Ingredient addition {addition_id} not found")
+
+    db.delete(addition)
+    db.commit()
+    return {"message": f"Ingredient addition {addition_id} undone"}
 
 
 @router.post("/sg-measurements", response_model=SgMeasurementOut)
@@ -277,6 +311,21 @@ def list_sg_measurements(
     return all_sg_measurement_info(db)
 
 
+@router.post("/sg-measurements/{measurement_id}/undo")
+def undo_sg_measurement(
+    measurement_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    measurement = db.get(SpecificGravityMeasurement, measurement_id)
+    if not measurement:
+        raise HTTPException(404, f"SG measurement {measurement_id} not found")
+
+    db.delete(measurement)
+    db.commit()
+    return {"message": f"SG measurement {measurement_id} undone"}
+
+
 @router.post("/mass-measurements", response_model=MassMeasurementOut)
 def add_mass_measurement(
     body: MassMeasurementCreate,
@@ -300,12 +349,31 @@ def add_mass_measurement(
     return measurement
 
 
-@router.get("/mass-measurements")
+@router.get("/mass-measurements", response_model=list[MassMeasurementOut])
 def list_mass_measurements(
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
-    return all_mass_measurement_info(db)
+    return (
+        db.query(MassMeasurement)
+        .order_by(MassMeasurement.measurement_date, MassMeasurement.id)
+        .all()
+    )
+
+
+@router.post("/mass-measurements/{measurement_id}/undo")
+def undo_mass_measurement(
+    measurement_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    measurement = db.get(MassMeasurement, measurement_id)
+    if not measurement:
+        raise HTTPException(404, f"Mass measurement {measurement_id} not found")
+
+    db.delete(measurement)
+    db.commit()
+    return {"message": f"Mass measurement {measurement_id} undone"}
 
 
 @router.post("/rack", response_model=ContainerLogOut)
@@ -351,12 +419,24 @@ def bottle(
     if body.from_container_id == body.to_container_id:
         raise HTTPException(400, "Source and destination must differ")
     _get_container(db, body.from_container_id)
-    _get_container(db, body.to_container_id)
+    to_container = _get_container(db, body.to_container_id)
 
     bottle_dt = _resolve_dt(body.at, body.date)
     source_log = current_fermentation_log(db, body.from_container_id, bottle_dt)
     if not source_log:
         raise HTTPException(400, "No active fermentation on source container")
+
+    amount = body.amount if body.amount is not None else 0.0
+    unit = body.unit
+    if body.filled_mass_g is not None:
+        if to_container.empty_mass is None:
+            raise HTTPException(400, "Target bottle does not have an empty mass")
+        amount = body.filled_mass_g - to_container.empty_mass
+        if amount <= 0:
+            raise HTTPException(
+                400, "Filled bottle mass must be greater than empty mass"
+            )
+        unit = "g"
 
     close_open_log(db, body.to_container_id, bottle_dt)
     db.flush()
@@ -366,14 +446,49 @@ def bottle(
         fermentation_id=source_log.fermentation_id,
         start_date=bottle_dt,
         source_container_id=body.from_container_id,
-        amount=body.amount,
-        unit=body.unit,
+        amount=amount,
+        unit=unit,
         stage="bottled",
     )
     db.add(log)
     _commit_or_conflict(db, "Another rack/bottle/start happened for this container")
     db.refresh(log)
     return log
+
+
+@router.post("/bottle/{log_id}/undo")
+def undo_bottle(
+    log_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    log = db.get(ContainerFermentationLog, log_id)
+    if not log:
+        raise HTTPException(404, f"Bottling log {log_id} not found")
+    if log.stage != "bottled":
+        raise HTTPException(400, f"Log {log_id} is not a bottling log")
+
+    current_log = current_fermentation_log(db, log.container_id)
+    if current_log is None or current_log.id != log.id:
+        raise HTTPException(409, "Only the current bottling log can be undone")
+
+    previous_log = (
+        db.query(ContainerFermentationLog)
+        .filter(
+            ContainerFermentationLog.container_id == log.container_id,
+            ContainerFermentationLog.id != log.id,
+            ContainerFermentationLog.end_date == log.start_date,
+        )
+        .order_by(ContainerFermentationLog.start_date.desc())
+        .first()
+    )
+
+    db.delete(log)
+    db.flush()
+    if previous_log is not None:
+        previous_log.end_date = None
+    db.commit()
+    return {"message": f"Bottling log {log_id} undone"}
 
 
 @router.post("/empty/{container_id}", response_model=EmptyContainerResponse)
@@ -405,12 +520,18 @@ def calculate_abv(
             raise HTTPException(404, f"Ingredient {item.ingredient_id} not found")
         if item.unit not in str2unit:
             raise HTTPException(400, f"Unknown unit: {item.unit}")
+        ingredient_type = ingredient.ingredient_type or "Liquid"
+        is_solid = ingredient_type.lower() in {"solid", "solute"}
+        sugar_content = ingredient.sugar_content or 0
+        density = ingredient.density or 1.0
         ingredients_data.append(
             {
-                "ingredient_type": ingredient.ingredient_type or "Liquid",
+                "ingredient_type": ingredient_type,
                 "amount": item.amount * str2unit[item.unit],
-                "sugar_content": ingredient.sugar_content or 0,
-                "density": ingredient.density or 1.0,
+                "sugar_content": sugar_content
+                if is_solid
+                else sugar_content * units.g / units.L,
+                "density": density if is_solid else density * units.g / mL,
             }
         )
 
@@ -426,11 +547,17 @@ def calculate_abv(
         benchmarks.append(entry)
 
     return {
-        "max_abv": float(max_abv) if max_abv else 0,
-        "sugar_content_g_per_l": float(sugar_content.asNumber())
-        if sugar_content
+        "max_abv": float(max_abv.asNumber())
+        if hasattr(max_abv, "asNumber")
+        else float(max_abv),
+        "sugar_content_g_per_l": float(
+            sugar_content.asUnit(units.g / units.L).asNumber()
+        )
+        if sugar_content is not None
         else 0,
-        "volume_l": float(volume.asNumber()) if volume else 0,
+        "volume_l": float(volume.asUnit(units.L).asNumber())
+        if volume is not None
+        else 0,
         "container_volume_l": container.volume_liters,
         "benchmarks": benchmarks,
         "yeast": YEAST,

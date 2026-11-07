@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { api } from '@/lib/api';
+import type { ContainerOut } from '@/lib/types';
+import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +24,11 @@ export default function LabelsPage() {
 
   const [minId, setMinId] = useState(1);
   const [maxId, setMaxId] = useState(12);
+  const [nextLabelCount, setNextLabelCount] = useState(12);
   const [baseUrl, setBaseUrl] = useState('');
+  const [containers, setContainers] = useState<ContainerOut[]>([]);
+  const [highestContainerId, setHighestContainerId] = useState<number | null>(null);
+  const [loadingContainers, setLoadingContainers] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
@@ -38,7 +45,69 @@ export default function LabelsPage() {
     setBaseUrl(window.location.origin);
   }, []);
 
+  useEffect(() => {
+    if (!user?.is_admin) return;
+    let cancelled = false;
+    setLoadingContainers(true);
+    api.get<ContainerOut[]>('/api/containers?limit=500')
+      .then((containers) => {
+        if (cancelled) return;
+        setContainers(containers);
+        if (containers.length === 0) {
+          setHighestContainerId(null);
+          return;
+        }
+        setHighestContainerId(
+          Math.max(...containers.map((container) => container.id)),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setMessage({
+          type: 'error',
+          text: err instanceof Error ? err.message : 'Failed to load containers',
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingContainers(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const labelCount = maxId >= minId ? maxId - minId + 1 : 0;
+  const isValidRange = minId >= 1 && maxId >= minId && labelCount <= 1000;
+  const canGenerate = !generating && isValidRange;
+  const recentBottleIds = containers
+    .filter((container) => container.container_type === 'bottle')
+    .map((container) => container.id)
+    .sort((a, b) => a - b)
+    .slice(-12);
+
+  const useRecentBottles = () => {
+    if (recentBottleIds.length === 0) return;
+    setMinId(Math.min(...recentBottleIds));
+    setMaxId(Math.max(...recentBottleIds));
+  };
+
+  const useNextLabels = () => {
+    if (highestContainerId === null || nextLabelCount < 1) return;
+    setMinId(highestContainerId + 1);
+    setMaxId(highestContainerId + nextLabelCount);
+  };
+
   const handleGenerate = async () => {
+    if (!isValidRange) {
+      setMessage({
+        type: 'error',
+        text: maxId < minId
+          ? 'Max Container ID must be greater than or equal to Min Container ID.'
+          : 'Label range must be between 1 and 1000 labels.',
+      });
+      return;
+    }
     setGenerating(true);
     setMessage(null);
     try {
@@ -71,10 +140,9 @@ export default function LabelsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      const count = maxId - minId + 1;
       setMessage({
         type: 'success',
-        text: `Generated PDF with ${count} label(s).`,
+        text: `Generated PDF with ${labelCount} label(s) for containers ${minId}-${maxId}.`,
       });
     } catch (err) {
       setMessage({
@@ -104,6 +172,59 @@ export default function LabelsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <span>
+                {loadingContainers
+                  ? 'Loading container IDs...'
+                  : highestContainerId === null
+                    ? 'No containers found.'
+                    : `Highest container ID: ${highestContainerId}`}
+              </span>
+              {highestContainerId !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setMinId(1);
+                    setMaxId(highestContainerId);
+                  }}
+                >
+                  {`Use 1-${highestContainerId}`}
+                </Button>
+              )}
+              {recentBottleIds.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={useRecentBottles}
+                >
+                  Use recent bottles
+                </Button>
+              )}
+            </div>
+            {highestContainerId !== null && (
+              <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="next_label_count">Next label count</Label>
+                  <Input
+                    id="next_label_count"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={nextLabelCount}
+                    onChange={(e) => setNextLabelCount(Number(e.target.value))}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={useNextLabels}
+                  disabled={nextLabelCount < 1 || nextLabelCount > 1000}
+                >
+                  Use next labels
+                </Button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="min_id">Min Container ID</Label>
@@ -126,6 +247,17 @@ export default function LabelsPage() {
                 />
               </div>
             </div>
+            <p
+              className={
+                isValidRange
+                  ? 'text-sm text-muted-foreground'
+                  : 'text-sm text-destructive'
+              }
+            >
+              {maxId < minId
+                ? 'Invalid range.'
+                : `Label count: ${labelCount}`}
+            </p>
             <div className="space-y-2">
               <Label htmlFor="base_url">Base URL</Label>
               <Input
@@ -136,19 +268,9 @@ export default function LabelsPage() {
               />
             </div>
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
-            <Button onClick={handleGenerate} disabled={generating}>
+            <Button onClick={handleGenerate} disabled={!canGenerate}>
               {generating ? 'Generating...' : 'Generate PDF'}
             </Button>
           </div>

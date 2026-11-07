@@ -8,6 +8,9 @@ from alcopt.database.models import (
     ContainerFermentationLog,
     Fermentation,
     Ingredient,
+    IngredientAddition,
+    MassMeasurement,
+    SpecificGravityMeasurement,
 )
 
 
@@ -170,6 +173,39 @@ def test_list_ingredients(admin_client):
     assert data[0]["name"] == "Grape Juice"
 
 
+def test_calculate_abv_with_liquid_ingredient(admin_client):
+    _seed_containers()
+    ingredient_resp = admin_client.post(
+        "/api/brew/ingredients",
+        json={
+            "name": "Grape Juice",
+            "sugar_content": 200.0,
+            "ingredient_type": "Liquid",
+            "density": 1.0,
+            "price": 4.0,
+            "notes": "",
+        },
+    )
+    assert ingredient_resp.status_code == 200
+    ingredient_id = ingredient_resp.json()["id"]
+
+    resp = admin_client.post(
+        "/api/brew/calculate-abv",
+        json={
+            "container_id": 1,
+            "ingredients": [
+                {"ingredient_id": ingredient_id, "amount": 1250, "unit": "mL"}
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sugar_content_g_per_l"] == 200.0
+    assert data["volume_l"] == 1.25
+    assert data["container_volume_l"] == 5.0
+
+
 # --- Ingredient Additions ---
 
 
@@ -233,6 +269,61 @@ def test_list_additions(admin_client):
     assert resp.status_code == 200
 
 
+def test_list_additions_returns_api_shape(admin_client):
+    _seed_container_with_fermentation()
+    _seed_ingredient()
+    create_resp = admin_client.post(
+        "/api/brew/additions",
+        json={
+            "container_id": 1,
+            "ingredient_name": "Grape Juice",
+            "date": "2025-01-02",
+            "starting_amount": 0.0,
+            "ending_amount": 1000.0,
+            "unit": "mL",
+        },
+    )
+    assert create_resp.status_code == 200
+
+    resp = admin_client.get("/api/brew/additions")
+
+    assert resp.status_code == 200
+    item = resp.json()[0]
+    assert item["id"] == create_resp.json()["id"]
+    assert item["container_id"] == 1
+    assert item["ingredient_id"] == 1
+    assert item["ingredient_name"] == "Grape Juice"
+    assert item["added_at"].startswith("2025-01-02")
+    assert item["amount"] == 1000.0
+    assert item["unit"] == "mL"
+
+
+def test_undo_ingredient_addition_deletes_record(admin_client):
+    _seed_container_with_fermentation()
+    _seed_ingredient()
+    create_resp = admin_client.post(
+        "/api/brew/additions",
+        json={
+            "container_id": 1,
+            "ingredient_name": "Grape Juice",
+            "date": "2025-01-02",
+            "starting_amount": 0.0,
+            "ending_amount": 1000.0,
+            "unit": "mL",
+        },
+    )
+    assert create_resp.status_code == 200
+    addition_id = create_resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/additions/{addition_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(IngredientAddition, addition_id) is None
+    db.close()
+
+
 # --- SG Measurements ---
 
 
@@ -250,6 +341,28 @@ def test_add_sg_measurement(admin_client):
     data = resp.json()
     assert data["specific_gravity"] == 1.090
     assert data["fermentation_id"] == 1
+
+
+def test_undo_sg_measurement_deletes_record(admin_client):
+    _seed_container_with_fermentation()
+    create_resp = admin_client.post(
+        "/api/brew/sg-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "specific_gravity": 1.090,
+        },
+    )
+    assert create_resp.status_code == 200
+    measurement_id = create_resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/sg-measurements/{measurement_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(SpecificGravityMeasurement, measurement_id) is None
+    db.close()
 
 
 def test_add_sg_no_fermentation(admin_client):
@@ -281,6 +394,50 @@ def test_add_mass_measurement(admin_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["mass"] == 5200.0
+
+
+def test_list_mass_measurements_returns_api_shape(admin_client):
+    _seed_container_with_fermentation()
+    create_resp = admin_client.post(
+        "/api/brew/mass-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "mass": 5200.0,
+        },
+    )
+    assert create_resp.status_code == 200
+
+    resp = admin_client.get("/api/brew/mass-measurements")
+
+    assert resp.status_code == 200
+    item = resp.json()[0]
+    assert item["id"] == create_resp.json()["id"]
+    assert item["fermentation_id"] == 1
+    assert item["measurement_date"] == "2025-01-15"
+    assert item["mass"] == 5200.0
+
+
+def test_undo_mass_measurement_deletes_record(admin_client):
+    _seed_container_with_fermentation()
+    create_resp = admin_client.post(
+        "/api/brew/mass-measurements",
+        json={
+            "container_id": 1,
+            "measurement_date": "2025-01-15",
+            "mass": 5200.0,
+        },
+    )
+    assert create_resp.status_code == 200
+    measurement_id = create_resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/mass-measurements/{measurement_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(MassMeasurement, measurement_id) is None
+    db.close()
 
 
 def test_add_mass_no_fermentation(admin_client):
@@ -378,6 +535,148 @@ def test_bottle(admin_client):
     source_log = db.query(ContainerFermentationLog).filter_by(container_id=1).first()
     assert source_log.end_date is None
     db.close()
+
+
+def test_bottle_with_filled_mass_uses_bottle_empty_mass(admin_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    bottle = db.get(Container, 3)
+    bottle.empty_mass = 500.0
+    db.commit()
+    db.close()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "filled_mass_g": 842.5,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["container_id"] == 3
+    assert data["amount"] == 342.5
+    assert data["unit"] == "g"
+
+
+def test_bottle_with_filled_mass_requires_empty_mass(admin_client):
+    _seed_container_with_fermentation()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "filled_mass_g": 842.5,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "empty mass" in resp.json()["detail"]
+
+
+def test_bottle_with_filled_mass_must_exceed_empty_mass(admin_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    bottle = db.get(Container, 3)
+    bottle.empty_mass = 500.0
+    db.commit()
+    db.close()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "filled_mass_g": 499.9,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "greater than empty mass" in resp.json()["detail"]
+
+
+def test_undo_bottle_deletes_current_bottling_log(admin_client):
+    _seed_container_with_fermentation()
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "amount": 750.0,
+            "unit": "mL",
+        },
+    )
+    assert resp.status_code == 200
+    log_id = resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/bottle/{log_id}/undo")
+
+    assert undo.status_code == 200
+    assert "undone" in undo.json()["message"]
+    db = TestSession()
+    assert db.get(ContainerFermentationLog, log_id) is None
+    assert (
+        db.query(ContainerFermentationLog)
+        .filter_by(container_id=3, end_date=None)
+        .first()
+        is None
+    )
+    db.close()
+
+
+def test_undo_bottle_restores_previous_open_bottle_log(admin_client):
+    _seed_container_with_fermentation()
+    db = TestSession()
+    db.add(Fermentation(id=2, start_date=date(2025, 2, 1)))
+    db.flush()
+    previous_log = ContainerFermentationLog(
+        container_id=3,
+        fermentation_id=2,
+        start_date=datetime(2025, 2, 1),
+        stage="bottled",
+    )
+    db.add(previous_log)
+    db.commit()
+    previous_log_id = previous_log.id
+    db.close()
+
+    resp = admin_client.post(
+        "/api/brew/bottle",
+        json={
+            "from_container_id": 1,
+            "to_container_id": 3,
+            "date": "2025-03-01",
+            "amount": 750.0,
+            "unit": "mL",
+        },
+    )
+    assert resp.status_code == 200
+    log_id = resp.json()["id"]
+
+    undo = admin_client.post(f"/api/brew/bottle/{log_id}/undo")
+
+    assert undo.status_code == 200
+    db = TestSession()
+    restored_log = db.get(ContainerFermentationLog, previous_log_id)
+    assert restored_log.end_date is None
+    assert db.get(ContainerFermentationLog, log_id) is None
+    db.close()
+
+
+def test_undo_bottle_rejects_non_bottling_log(admin_client):
+    _seed_container_with_fermentation()
+
+    resp = admin_client.post("/api/brew/bottle/1/undo")
+
+    assert resp.status_code == 400
+    assert "bottling log" in resp.json()["detail"]
 
 
 def test_bottle_no_source_fermentation(admin_client):

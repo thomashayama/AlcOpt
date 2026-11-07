@@ -1,10 +1,11 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api } from '@/lib/api';
-import type { ReviewOut } from '@/lib/types';
+import type { ContainerInfoResponse, ReviewOut } from '@/lib/types';
+import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -310,8 +311,8 @@ function TastingPage() {
   const searchParams = useSearchParams();
   const prefilledId = searchParams.get('container_id');
 
-  const [containerId, setContainerId] = useState<number>(
-    prefilledId ? parseInt(prefilledId, 10) : 1,
+  const [containerId, setContainerId] = useState<number | ''>(
+    prefilledId ? parseInt(prefilledId, 10) : '',
   );
   const [tastingDate, setTastingDate] = useState(
     new Date().toISOString().slice(0, 10),
@@ -330,10 +331,19 @@ function TastingPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+  const [containerContext, setContainerContext] =
+    useState<ContainerInfoResponse | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [contextMessage, setContextMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const [rubricOpen, setRubricOpen] = useState(false);
   const [reviews, setReviews] = useState<ReviewOut[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [lastReview, setLastReview] = useState<ReviewOut | null>(null);
+  const [undoing, setUndoing] = useState(false);
 
   const fetchReviews = async () => {
     try {
@@ -353,18 +363,49 @@ function TastingPage() {
     }
   }, [user]);
 
+  const fetchContainerContext = useCallback(async (id: number | '') => {
+    if (id === '') return;
+    setContextLoading(true);
+    setContextMessage(null);
+    setContainerContext(null);
+    try {
+      const data = await api.get<ContainerInfoResponse>(`/api/containers/${id}`);
+      setContainerContext(data);
+    } catch (err) {
+      setContextMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to load container',
+      });
+    } finally {
+      setContextLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!prefilledId) return;
+    const parsed = parseInt(prefilledId, 10);
+    if (Number.isNaN(parsed)) return;
+    setContainerId(parsed);
+    fetchContainerContext(parsed);
+  }, [fetchContainerContext, prefilledId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (containerId === '') return;
     setSubmitting(true);
     setMessage(null);
     try {
-      await api.post('/api/reviews', {
-        container_id: containerId,
+      const review = await api.post<ReviewOut>('/api/reviews', {
+        container_id: Number(containerId),
         tasting_date: tastingDate,
         ...ratings,
         ...(user ? {} : { email }),
       });
-      setMessage({ type: 'success', text: 'Review submitted successfully!' });
+      setLastReview(user ? review : null);
+      setMessage({
+        type: 'success',
+        text: `Review ${review.id} submitted for container ${review.container_id} (fermentation ${review.fermentation_id}).`,
+      });
       if (user) fetchReviews();
     } catch (err) {
       setMessage({
@@ -373,6 +414,27 @@ function TastingPage() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!lastReview) return;
+    setUndoing(true);
+    setMessage(null);
+    try {
+      const result = await api.post<{ message: string }>(
+        `/api/reviews/${lastReview.id}/undo`,
+      );
+      setLastReview(null);
+      setMessage({ type: 'success', text: result.message });
+      fetchReviews();
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to undo review',
+      });
+    } finally {
+      setUndoing(false);
     }
   };
 
@@ -482,7 +544,13 @@ function TastingPage() {
                   type="number"
                   min={1}
                   value={containerId}
-                  onChange={(e) => setContainerId(Number(e.target.value))}
+                  onChange={(e) => {
+                    setContainerId(
+                      e.target.value === '' ? '' : Number(e.target.value),
+                    );
+                    setContainerContext(null);
+                    setContextMessage(null);
+                  }}
                   required
                 />
               </div>
@@ -497,6 +565,56 @@ function TastingPage() {
                 />
               </div>
             </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={containerId === '' || contextLoading}
+                onClick={() => fetchContainerContext(containerId)}
+              >
+                {contextLoading ? 'Checking...' : 'Check Container'}
+              </Button>
+              <Message message={contextMessage} />
+            </div>
+
+            {containerContext && (
+              <div className="rounded-lg border border-input bg-muted/40 p-4 text-sm">
+                <h3 className="mb-2 font-medium">
+                  {`Container #${containerContext.container.id}`}
+                </h3>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-muted-foreground">Type</dt>
+                    <dd>{containerContext.container.container_type}</dd>
+                  </div>
+                  {containerContext.fermentation && (
+                    <div>
+                      <dt className="text-muted-foreground">Fermentation</dt>
+                      <dd>{`Fermentation #${containerContext.fermentation.id}`}</dd>
+                    </div>
+                  )}
+                  {containerContext.fermentation_log?.stage && (
+                    <div>
+                      <dt className="text-muted-foreground">Stage</dt>
+                      <dd>{`Stage: ${containerContext.fermentation_log.stage}`}</dd>
+                    </div>
+                  )}
+                  {containerContext.abv != null && (
+                    <div>
+                      <dt className="text-muted-foreground">ABV</dt>
+                      <dd>{`ABV: ${containerContext.abv.toFixed(2)}%`}</dd>
+                    </div>
+                  )}
+                  {containerContext.residual_sugar != null && (
+                    <div>
+                      <dt className="text-muted-foreground">Residual Sugar</dt>
+                      <dd>{`${containerContext.residual_sugar.toFixed(1)} g/L`}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            )}
 
             {RATING_FIELDS.map(({ key, label, low, high }) => (
               <div key={key} className="space-y-2">
@@ -527,21 +645,28 @@ function TastingPage() {
               </div>
             ))}
 
-            {message && (
-              <p
-                className={
-                  message.type === 'success'
-                    ? 'text-sm text-green-500'
-                    : 'text-sm text-destructive'
-                }
-              >
-                {message.text}
-              </p>
-            )}
+            <Message message={message} />
 
-            <Button type="submit" disabled={submitting} className="h-10 w-full sm:h-8 sm:w-auto">
-              {submitting ? 'Submitting...' : 'Submit Review'}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="submit"
+                disabled={submitting || containerId === ''}
+                className="h-10 flex-1 sm:h-8 sm:flex-none"
+              >
+                {submitting ? 'Submitting...' : 'Submit Review'}
+              </Button>
+              {lastReview && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="h-10 flex-1 sm:h-8 sm:flex-none"
+                  onClick={handleUndo}
+                  disabled={undoing}
+                >
+                  {undoing ? 'Undoing...' : 'Undo Last Review'}
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
