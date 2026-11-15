@@ -29,15 +29,18 @@ export function Header() {
       <MobileNav />
 
       {/* Tablet / desktop: full header bar */}
-      <header className="sticky top-0 z-50 hidden border-b md:block" style={{ backgroundColor: '#262730' }}>
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+      <header className="sticky top-0 z-50 hidden border-b border-border bg-background md:block">
+        <div className="mx-auto flex h-[62px] max-w-7xl items-center justify-between px-5">
           {/* Left: brand + nav */}
-          <div className="flex items-center gap-6">
-            <Link href="/" className="text-lg font-bold text-foreground">
+          <div className="flex items-center gap-8">
+            <Link
+              href="/"
+              className="font-heading text-3xl leading-none font-semibold text-foreground"
+            >
               AlcOpt
             </Link>
 
-            <nav className="flex items-center gap-4 text-sm">
+            <nav className="flex items-center gap-6 text-[0.9375rem]">
               {links.map((l) => {
                 const active = isActivePath(pathname, l.href);
                 return (
@@ -46,8 +49,11 @@ export function Header() {
                     href={l.href}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'transition-colors hover:text-foreground',
-                      active ? 'text-foreground' : 'text-muted-foreground',
+                      // Full-height link so the gold underline sits on the header rule.
+                      '-mb-px flex h-[62px] items-center border-b-2 transition-colors hover:text-foreground',
+                      active
+                        ? 'border-accent text-foreground'
+                        : 'border-transparent text-muted-foreground',
                     )}
                   >
                     {l.label}
@@ -62,7 +68,7 @@ export function Header() {
             {loading ? null : user ? (
               <Popover>
                 <PopoverTrigger
-                  className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
                 >
                   {displayName}
                 </PopoverTrigger>
@@ -86,12 +92,7 @@ export function Header() {
                 </PopoverContent>
               </Popover>
             ) : (
-              <Button
-                onClick={() => login()}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                Login
-              </Button>
+              <Button onClick={() => login()}>Login</Button>
             )}
           </div>
         </div>

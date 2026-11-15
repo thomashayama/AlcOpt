@@ -7,7 +7,7 @@ Fermentation tracking and optimization app. FastAPI backend + Next.js frontend, 
 - **Backend** (`backend/`): FastAPI, SQLAlchemy, Python 3.11, managed by uv
 - **Frontend** (`frontend/`): Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Recharts
 - **Auth**: Google OAuth redirect flow → JWT in httpOnly cookies
-- **Theme**: Wine-cellar dark (burgundy #A4243B, gold #D4A24C, dark brown backgrounds)
+- **Theme**: "Cellar", wine-cellar dark: cask-brown surfaces (#1A1410), burgundy #A4243B for actions, gold #D4A24C for selected/focused/first. Cormorant Garamond headings (`font-heading`, `page-title`), Hanken Grotesk body. Tokens live in `frontend/src/app/globals.css`; chart colours in `frontend/src/lib/theme.ts` (keep the two in sync).
 
 ## Environment
 

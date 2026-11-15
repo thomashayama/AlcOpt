@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import type { ContainerOut } from '@/lib/types';
 import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, selectClassName } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -24,8 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-
-const selectClassName = 'flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm';
 
 const VESSEL_PRESETS = [
   {
@@ -495,8 +493,8 @@ export default function BottlesPage() {
   if (!user || !user.is_admin) return null;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-8 md:py-8">
-      <h1 className="text-2xl font-semibold">Bottle Log</h1>
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-12 md:px-5 md:pt-11 md:pb-16">
+      <h1 className="page-title">Bottle Log</h1>
       <Tabs defaultValue={0}>
         <TabsList>
           <TabsTrigger value={0}>New Vessel</TabsTrigger>
