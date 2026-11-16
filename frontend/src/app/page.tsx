@@ -3,10 +3,18 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { theme } from '@/lib/theme';
+import {
+  chartAxisLine,
+  chartAxisTitle,
+  chartTick,
+  chartTooltipStyle,
+  correlationColor,
+  theme,
+} from '@/lib/theme';
+import { cn } from '@/lib/utils';
 import type { LeaderboardEntry, ReviewOut } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -117,6 +125,45 @@ function buildTrendlineData(
   ];
 }
 
+function count(n: number, noun: string) {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+/** Thin rule with a diamond, as on a printed wine label. */
+function LabelRule() {
+  return (
+    <div aria-hidden className="mx-auto my-3.5 flex w-2/3 items-center gap-2.5">
+      <span className="h-px flex-1 bg-current opacity-45" />
+      <span className="size-1.5 rotate-45 bg-primary" />
+      <span className="h-px flex-1 bg-current opacity-45" />
+    </div>
+  );
+}
+
+/** The top-ranked fermentation, set as a bottle label. */
+function TopRatedLabel({ entry }: { entry: LeaderboardEntry }) {
+  return (
+    <aside
+      aria-label="Top rated fermentation"
+      className="flex flex-col justify-center rounded-xs bg-label px-6 py-9 text-center text-label-foreground outline-1 outline-offset-[-10px] outline-label-foreground/50"
+    >
+      <p className="font-heading text-[1.3125rem] leading-none font-medium italic">Top rated</p>
+      <LabelRule />
+      <p className="font-heading text-xl leading-none font-medium tracking-[0.08em]">
+        Fermentation
+      </p>
+      <p className="font-heading text-7xl leading-none font-bold">Nº {entry.fermentation_id}</p>
+      <LabelRule />
+      <p className="font-heading text-[2.875rem] leading-none font-semibold text-primary">
+        {entry.avg_rating.toFixed(2)}
+      </p>
+      <p className="mt-1.5 text-[0.8125rem]">
+        average of {count(entry.num_ratings, 'tasting')}
+      </p>
+    </aside>
+  );
+}
+
 export default function HomePage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [reviews, setReviews] = useState<ReviewOut[]>([]);
@@ -193,74 +240,91 @@ export default function HomePage() {
     );
   }
 
+  const topRated = leaderboard[0];
+
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-2 pb-8 sm:space-y-8 md:py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold sm:text-3xl">AlcOpt Dashboard</h1>
-        <Link href="/tasting">
-          <Button>Submit Tasting</Button>
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-2 pb-12 md:px-5 md:pt-11 md:pb-16">
+      <div className="flex flex-wrap items-end justify-between gap-4 pb-1">
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="mt-2.5 text-muted-foreground">
+            {reviews.length === 0
+              ? 'No tastings yet.'
+              : `${count(reviews.length, 'tasting')} across ${count(leaderboard.length, 'fermentation')}.`}
+          </p>
+        </div>
+        <Link href="/tasting" className={cn(buttonVariants(), 'max-sm:w-full')}>
+          Submit Tasting
         </Link>
       </div>
 
-      {/* Leaderboard */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Leaderboard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {leaderboard.length === 0 ? (
-            <p className="text-muted-foreground">No ratings yet.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10 sm:w-16">
-                    <span className="sm:hidden">#</span>
-                    <span className="hidden sm:inline">Rank</span>
-                  </TableHead>
-                  <TableHead>
-                    <span className="sm:hidden">Ferm.</span>
-                    <span className="hidden sm:inline">Fermentation</span>
-                  </TableHead>
-                  <TableHead>Avg Rating</TableHead>
-                  <TableHead className="text-right sm:w-24">Reviews</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leaderboard.map((entry) => (
-                  <TableRow key={entry.fermentation_id}>
-                    <TableCell className="font-medium">{entry.rank}</TableCell>
-                    <TableCell>
-                      <span className="hidden sm:inline">Fermentation </span>#
-                      {entry.fermentation_id}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="h-2.5 w-14 shrink-0 rounded-full sm:w-32 bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${(entry.avg_rating / maxRating) * 100}%`,
-                              backgroundColor: theme.primary,
-                            }}
-                          />
-                        </div>
-                        <span className="text-sm tabular-nums">
-                          {entry.avg_rating.toFixed(2)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">{entry.num_ratings}</TableCell>
+      {/* Top-rated label + leaderboard */}
+      <div className={cn('grid gap-6', topRated && 'md:grid-cols-[280px_1fr] lg:grid-cols-[300px_1fr]')}>
+        {topRated && <TopRatedLabel entry={topRated} />}
+        <Card>
+          <CardHeader>
+            <CardTitle>Leaderboard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {leaderboard.length === 0 ? (
+              <p className="text-muted-foreground">No ratings yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10 sm:w-16">
+                      <span className="sm:hidden">#</span>
+                      <span className="hidden sm:inline">Rank</span>
+                    </TableHead>
+                    <TableHead>
+                      <span className="sm:hidden">Ferm.</span>
+                      <span className="hidden sm:inline">Fermentation</span>
+                    </TableHead>
+                    <TableHead>Avg Rating</TableHead>
+                    <TableHead className="text-right sm:w-24">Reviews</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {leaderboard.map((entry, i) => (
+                    <TableRow key={entry.fermentation_id}>
+                      <TableCell
+                        className={cn(
+                          'font-heading text-2xl leading-none font-semibold',
+                          i === 0 ? 'text-accent' : 'text-muted-foreground',
+                        )}
+                      >
+                        {entry.rank}
+                      </TableCell>
+                      <TableCell>
+                        <span className="hidden sm:inline">Fermentation </span>#
+                        {entry.fermentation_id}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-well sm:w-28 lg:w-48">
+                            <div
+                              className={cn(
+                                'h-full rounded-full',
+                                i === 0 ? 'bg-accent' : 'bg-chart-1',
+                              )}
+                              style={{ width: `${(entry.avg_rating / maxRating) * 100}%` }}
+                            />
+                          </div>
+                          <span>{entry.avg_rating.toFixed(2)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{entry.num_ratings}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts grid */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Correlation Heatmap */}
         <Card>
           <CardHeader>
@@ -283,29 +347,24 @@ export default function HomePage() {
                     tickSize: 0,
                     tickPadding: 5,
                   }}
-                  colors={{
-                    type: 'diverging',
-                    scheme: 'red_yellow_blue',
-                    minValue: 1,
-                    maxValue: -1,
-                    divergeAt: 0.5,
-                  }}
-                  emptyColor="#3A2F2A"
-                  borderWidth={1}
-                  borderColor="#1A1410"
+                  colors={(cell) => correlationColor(cell.value)}
+                  emptyColor={theme.surface}
+                  borderWidth={2}
+                  borderColor={theme.card}
                   theme={{
                     text: { fill: theme.text },
                     axis: {
-                      ticks: { text: { fill: theme.text, fontSize: 11 } },
+                      ticks: { text: { fill: theme.muted, fontSize: 11 } },
                     },
                     tooltip: {
                       container: {
                         background: theme.surface,
                         color: theme.text,
+                        borderRadius: 4,
                       },
                     },
                   }}
-                  labelTextColor={{ from: 'color', modifiers: [['darker', 3]] }}
+                  labelTextColor={theme.text}
                   hoverTarget="cell"
                 />
               </div>
@@ -325,31 +384,23 @@ export default function HomePage() {
               <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={ratingDistribution}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
+                    <CartesianGrid vertical={false} stroke={theme.grid} />
                     <XAxis
                       dataKey="rating"
-                      label={{ value: 'Rating', position: 'insideBottom', offset: -5, fill: theme.text }}
-                      tick={{ fill: theme.text }}
+                      label={chartAxisTitle('Rating', 'bottom')}
+                      tick={chartTick}
+                      axisLine={chartAxisLine}
+                      tickLine={false}
                     />
                     <YAxis
                       allowDecimals={false}
-                      label={{
-                        value: 'Count',
-                        angle: -90,
-                        position: 'insideLeft',
-                        fill: theme.text,
-                      }}
-                      tick={{ fill: theme.text }}
+                      label={chartAxisTitle('Count', 'left')}
+                      tick={chartTick}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme.surface,
-                        border: `1px solid ${theme.primary}`,
-                        color: theme.text,
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Bar dataKey="count" fill={theme.primary} radius={[4, 4, 0, 0]} />
+                    <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: theme.grid }} />
+                    <Bar dataKey="count" fill={theme.wine} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -369,42 +420,39 @@ export default function HomePage() {
               <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
+                    <CartesianGrid stroke={theme.grid} />
                     <XAxis
                       dataKey="x"
                       type="number"
                       name="ABV"
                       unit="%"
-                      label={{ value: 'ABV %', position: 'insideBottom', offset: -5, fill: theme.text }}
-                      tick={{ fill: theme.text }}
+                      label={chartAxisTitle('ABV %', 'bottom')}
+                      tick={chartTick}
+                      axisLine={chartAxisLine}
+                      tickLine={false}
                     />
                     <YAxis
                       dataKey="y"
                       type="number"
                       name="Rating"
                       domain={[0, 5]}
-                      label={{
-                        value: 'Overall Rating',
-                        angle: -90,
-                        position: 'insideLeft',
-                        fill: theme.text,
-                      }}
-                      tick={{ fill: theme.text }}
+                      label={chartAxisTitle('Overall Rating', 'left')}
+                      tick={chartTick}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme.surface,
-                        border: `1px solid ${theme.primary}`,
-                        color: theme.text,
-                        borderRadius: 8,
-                      }}
+                    <Tooltip contentStyle={chartTooltipStyle} cursor={{ stroke: theme.axis }} />
+                    <Scatter
+                      data={abvScatter}
+                      fill={theme.gold}
+                      stroke={theme.card}
+                      strokeWidth={1.5}
                     />
-                    <Scatter data={abvScatter} fill={theme.accent} />
                     {abvTrend.length > 0 && (
                       <Line
                         data={abvTrend}
                         dataKey="y"
-                        stroke={theme.primary}
+                        stroke={theme.wine}
                         strokeWidth={2}
                         dot={false}
                         legendType="none"
@@ -429,46 +477,38 @@ export default function HomePage() {
               <div className="h-[300px] sm:h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
+                    <CartesianGrid stroke={theme.grid} />
                     <XAxis
                       dataKey="x"
                       type="number"
                       name="Residual Sugar"
-                      label={{
-                        value: 'Residual Sugar (g/L)',
-                        position: 'insideBottom',
-                        offset: -5,
-                        fill: theme.text,
-                      }}
-                      tick={{ fill: theme.text }}
+                      label={chartAxisTitle('Residual Sugar (g/L)', 'bottom')}
+                      tick={chartTick}
+                      axisLine={chartAxisLine}
+                      tickLine={false}
                     />
                     <YAxis
                       dataKey="y"
                       type="number"
                       name="Rating"
                       domain={[0, 5]}
-                      label={{
-                        value: 'Overall Rating',
-                        angle: -90,
-                        position: 'insideLeft',
-                        fill: theme.text,
-                      }}
-                      tick={{ fill: theme.text }}
+                      label={chartAxisTitle('Overall Rating', 'left')}
+                      tick={chartTick}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme.surface,
-                        border: `1px solid ${theme.primary}`,
-                        color: theme.text,
-                        borderRadius: 8,
-                      }}
+                    <Tooltip contentStyle={chartTooltipStyle} cursor={{ stroke: theme.axis }} />
+                    <Scatter
+                      data={rsScatter}
+                      fill={theme.gold}
+                      stroke={theme.card}
+                      strokeWidth={1.5}
                     />
-                    <Scatter data={rsScatter} fill={theme.accent} />
                     {rsTrend.length > 0 && (
                       <Line
                         data={rsTrend}
                         dataKey="y"
-                        stroke={theme.primary}
+                        stroke={theme.wine}
                         strokeWidth={2}
                         dot={false}
                         legendType="none"

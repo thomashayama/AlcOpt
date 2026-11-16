@@ -447,17 +447,20 @@ function TastingPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 pt-2 pb-8 sm:space-y-8 md:py-8">
+    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 pt-2 pb-12 md:px-5 md:pt-11 md:pb-16">
+      <h1 className="page-title">Tasting</h1>
+
       <Card>
         <CardHeader>
           <button
             type="button"
             onClick={() => setRubricOpen((o) => !o)}
-            className="flex w-full items-center justify-between gap-3 text-left"
+            aria-expanded={rubricOpen}
+            className="flex w-full items-baseline justify-between gap-3 text-left"
           >
             <CardTitle>Tasting Rubric</CardTitle>
             <span className="shrink-0 text-muted-foreground text-sm">
-              {rubricOpen ? '▲ Hide' : '▼ Show guide'}
+              {rubricOpen ? 'Hide guide' : 'Show guide'}
             </span>
           </button>
           <p className="text-sm text-muted-foreground">
@@ -469,7 +472,7 @@ function TastingPage() {
           <CardContent className="space-y-6">
             {RUBRIC.map((attr) => (
               <div key={attr.attribute}>
-                <h3 className="mb-1 text-base font-semibold text-[#D4A24C]">
+                <h3 className="mb-1 font-heading text-[1.375rem] leading-tight font-semibold text-accent">
                   {attr.attribute}
                 </h3>
                 <p className="mb-3 text-sm text-muted-foreground">
@@ -479,10 +482,10 @@ function TastingPage() {
                   {attr.levels.map((lvl) => (
                     <div
                       key={lvl.score}
-                      className="rounded-md border border-border/50 bg-card/50 p-3"
+                      className="rounded-md border border-border bg-muted/50 p-3"
                     >
                       <div className="mb-1 flex items-baseline gap-2">
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#A4243B] text-xs font-bold text-white">
+                        <span className="w-4 font-heading text-[1.375rem] leading-none font-semibold text-accent">
                           {lvl.score}
                         </span>
                         <span className="font-medium">{lvl.label}</span>
@@ -490,13 +493,13 @@ function TastingPage() {
                       <p className="mb-1 text-sm">{lvl.detail}</p>
                       <div className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
                         <p>
-                          <span className="font-medium text-[#D4A24C]">
+                          <span className="font-medium text-foreground">
                             Wines:{' '}
                           </span>
                           {lvl.wines}
                         </p>
                         <p>
-                          <span className="font-medium text-[#D4A24C]">
+                          <span className="font-medium text-foreground">
                             Tastes like:{' '}
                           </span>
                           {lvl.foods}
@@ -579,8 +582,8 @@ function TastingPage() {
             </div>
 
             {containerContext && (
-              <div className="rounded-lg border border-input bg-muted/40 p-4 text-sm">
-                <h3 className="mb-2 font-medium">
+              <div className="rounded-r-md border-l-2 border-accent bg-muted px-5 py-4 text-sm">
+                <h3 className="mb-2.5 font-heading text-[1.4375rem] leading-tight font-semibold">
                   {`Container #${containerContext.container.id}`}
                 </h3>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
@@ -618,9 +621,9 @@ function TastingPage() {
 
             {RATING_FIELDS.map(({ key, label, low, high }) => (
               <div key={key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>{label}</Label>
-                  <span className="text-sm font-medium tabular-nums">
+                <div className="flex items-baseline justify-between">
+                  <Label className="text-[0.9375rem] text-foreground">{label}</Label>
+                  <span className="font-heading text-[1.75rem] leading-none font-semibold text-accent tabular-nums">
                     {ratings[key].toFixed(1)}
                   </span>
                 </div>
@@ -651,7 +654,7 @@ function TastingPage() {
               <Button
                 type="submit"
                 disabled={submitting || containerId === ''}
-                className="h-10 flex-1 sm:h-8 sm:flex-none"
+                className="flex-1 sm:flex-none"
               >
                 {submitting ? 'Submitting...' : 'Submit Review'}
               </Button>
@@ -659,7 +662,7 @@ function TastingPage() {
                 <Button
                   type="button"
                   variant="destructive"
-                  className="h-10 flex-1 sm:h-8 sm:flex-none"
+                  className="flex-1 sm:flex-none"
                   onClick={handleUndo}
                   disabled={undoing}
                 >

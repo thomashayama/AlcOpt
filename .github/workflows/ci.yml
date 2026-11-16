@@ -21,7 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: uv sync --frozen
+      # ruff and pytest live in the "dev" extra, which a plain sync skips.
+      - run: uv sync --frozen --extra dev
       - run: uv run ruff check alcopt/
       - run: uv run ruff format --check alcopt/
       - run: uv run pytest -x

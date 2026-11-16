@@ -39,7 +39,7 @@ export function MobileNav() {
         onClick={close}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'flex h-11 items-center rounded-lg px-3 text-base transition-colors',
+          'flex h-11 items-center rounded-md px-3 text-base transition-colors',
           active
             ? 'bg-sidebar-accent font-medium text-sidebar-foreground shadow-[inset_3px_0_0_var(--sidebar-primary)]'
             : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground',
@@ -58,7 +58,7 @@ export function MobileNav() {
       <Drawer.Root open={open} onOpenChange={setOpen} swipeDirection="left">
         <Drawer.Trigger
           aria-label="Open menu"
-          className="pointer-events-auto inline-flex size-10 items-center justify-center rounded-lg bg-[#262730]/90 text-foreground shadow-md ring-1 ring-foreground/10 backdrop-blur transition-colors hover:bg-[#262730] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="pointer-events-auto inline-flex size-10 items-center justify-center rounded-md bg-card/90 text-foreground shadow-md ring-1 ring-input backdrop-blur transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <Menu className="size-5" />
         </Drawer.Trigger>
@@ -80,14 +80,14 @@ export function MobileNav() {
                 <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border pr-2 pl-4">
                   <Drawer.Title
                     render={
-                      <Link href="/" onClick={close} className="text-lg font-bold">
+                      <Link href="/" onClick={close} className="font-heading text-[1.75rem] leading-none font-semibold">
                         AlcOpt
                       </Link>
                     }
                   />
                   <Drawer.Close
                     aria-label="Close menu"
-                    className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   >
                     <X className="size-5" />
                   </Drawer.Close>
@@ -99,7 +99,7 @@ export function MobileNav() {
                   {mainLinks.map((l) => renderLink(l.href, l.label))}
                   {adminLinks.length > 0 && (
                     <>
-                      <p className="px-3 pt-4 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      <p className="px-3 pt-4 pb-1 text-[0.8125rem] text-muted-foreground">
                         Admin
                       </p>
                       {adminLinks.map((l) => renderLink(l.href, l.label))}
@@ -123,7 +123,7 @@ export function MobileNav() {
                       </div>
                       <Button
                         variant="outline"
-                        className="h-10 w-full"
+                        className="w-full"
                         onClick={() => {
                           close();
                           logout();
@@ -134,7 +134,7 @@ export function MobileNav() {
                       </Button>
                     </div>
                   ) : (
-                    <Button className="h-10 w-full" onClick={() => login()}>
+                    <Button className="w-full" onClick={() => login()}>
                       Login
                     </Button>
                   )}

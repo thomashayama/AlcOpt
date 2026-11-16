@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import type { AdditionOut, IngredientOut } from '@/lib/types';
 import { Message } from '@/components/Message';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, selectClassName } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -198,7 +198,7 @@ export function IngredientsTab() {
               <Label htmlFor="ingredient_select">Ingredient</Label>
               <select
                 id="ingredient_select"
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className={selectClassName}
                 value={selectedIngredient}
                 onChange={(e) => {
                   setSelectedIngredient(e.target.value);
@@ -231,7 +231,7 @@ export function IngredientsTab() {
                     <Label htmlFor="ing_type">Type</Label>
                     <select
                       id="ing_type"
-                      className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className={selectClassName}
                       value={ingredientType}
                       onChange={(e) => setIngredientType(e.target.value)}
                     >

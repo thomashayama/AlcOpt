@@ -3,13 +3,12 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { FermentationActiveOut } from '@/lib/types';
+import { selectClassName } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export type ContainerIdValue = number | '';
 
 export const VALID_UNITS = ['g', 'kg', 'mL', 'L', 'tsp', 'tbsp'] as const;
-
-const selectClassName = 'flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm';
 
 function toDate(value: string) {
   return value.slice(0, 10);

@@ -165,7 +165,8 @@ export default function LabelsPage() {
   if (!user || !user.is_admin) return null;
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8 px-4 pt-2 pb-8 md:py-8">
+    <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-2 pb-12 md:px-5 md:pt-11 md:pb-16">
+      <h1 className="page-title">Labels</h1>
       <Card>
         <CardHeader>
           <CardTitle>Generate Container Labels</CardTitle>

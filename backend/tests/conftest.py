@@ -1,17 +1,24 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+import os
 
-from alcopt.api.dependencies import (
+# The app's startup hook runs init_db() on the engine built from DATABASE_URL.
+# Point it at an in-memory database before alcopt is imported, so the tests
+# never open (or need) data/alcopt.db or whatever DATABASE_URL is set to.
+os.environ["DATABASE_URL"] = "sqlite://"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
+
+from alcopt.api.dependencies import (  # noqa: E402
     get_db,
     get_current_user,
     get_optional_user,
     require_admin,
 )
-from alcopt.api.main import app
-from alcopt.database.models import Base
+from alcopt.api.main import app  # noqa: E402
+from alcopt.database.models import Base  # noqa: E402
 
 
 engine = create_engine(

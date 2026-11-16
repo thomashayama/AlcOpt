@@ -91,10 +91,10 @@ export function ConfirmDialog({
             aria-modal="true"
             aria-labelledby="confirm-title"
             aria-describedby="confirm-desc"
-            className="bg-background border rounded-lg p-6 max-w-sm w-full mx-4 space-y-4"
+            className="bg-popover border border-input rounded-lg p-6 max-w-sm w-full mx-4 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="confirm-title" className="text-lg font-semibold">
+            <h3 id="confirm-title" className="font-heading text-2xl leading-tight font-semibold">
               {title}
             </h3>
             <p id="confirm-desc" className="text-sm text-muted-foreground">

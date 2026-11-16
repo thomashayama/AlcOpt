@@ -7,9 +7,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-cormorant), Georgia, "Times New Roman", serif;
+  --color-well: var(--well);
+  --color-label: var(--label);
+  --color-label-foreground: var(--label-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -72,7 +74,10 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.375rem;
+  --well: oklch(0.97 0 0);
+  --label: oklch(0.97 0 0);
+  --label-foreground: oklch(0.145 0 0);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -83,38 +88,47 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/*
+ * Cellar: the app's one theme. Cask-brown surfaces, parchment text, burgundy
+ * for actions, gold for what is selected, focused or first.
+ */
 .dark {
-  --background: #0f1117;
-  --foreground: #e4e4e7;
-  --card: #1c1e2a;
-  --card-foreground: #e4e4e7;
-  --popover: #1c1e2a;
-  --popover-foreground: #e4e4e7;
-  --primary: #A4243B;
-  --primary-foreground: #e4e4e7;
-  --secondary: #272937;
-  --secondary-foreground: #e4e4e7;
-  --muted: #272937;
-  --muted-foreground: #9ca3af;
-  --accent: #D4A24C;
-  --accent-foreground: #0f1117;
-  --destructive: #C23B22;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.12);
-  --ring: #A4243B;
-  --chart-1: #A4243B;
-  --chart-2: #D4A24C;
+  color-scheme: dark;
+  --background: #1A1410; /* cask */
+  --foreground: #F5F0E8; /* parchment */
+  --card: #231914; /* stave */
+  --card-foreground: #F5F0E8;
+  --popover: #2E221B;
+  --popover-foreground: #F5F0E8;
+  --primary: #A4243B; /* burgundy */
+  --primary-foreground: #F5F0E8;
+  --secondary: #2E221B;
+  --secondary-foreground: #F5F0E8;
+  --muted: #2E221B;
+  --muted-foreground: #B8A996; /* dust */
+  --accent: #D4A24C; /* gold */
+  --accent-foreground: #1A1410;
+  --destructive: #E26A52;
+  --border: rgba(245, 240, 232, 0.11);
+  --input: rgba(245, 240, 232, 0.24);
+  --ring: #D4A24C;
+  --well: #130E0B; /* recessed: input fields, meter tracks */
+  --label: #EDE3CE; /* bottle-label paper */
+  --label-foreground: #2B1A13;
+  /* Chart marks. 1 and 2 are the burgundy and gold stepped to clear 3:1 on --card; keep in sync with lib/theme.ts. */
+  --chart-1: #BE3F5A;
+  --chart-2: #B98A36;
   --chart-3: #7B2D3F;
   --chart-4: #8B6B3D;
   --chart-5: #5C1A2A;
-  --sidebar: #1c1e2a;
-  --sidebar-foreground: #e4e4e7;
-  --sidebar-primary: #A4243B;
-  --sidebar-primary-foreground: #e4e4e7;
-  --sidebar-accent: #272937;
-  --sidebar-accent-foreground: #e4e4e7;
-  --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: #A4243B;
+  --sidebar: #231914;
+  --sidebar-foreground: #F5F0E8;
+  --sidebar-primary: #D4A24C;
+  --sidebar-primary-foreground: #1A1410;
+  --sidebar-accent: #2E221B;
+  --sidebar-accent-foreground: #F5F0E8;
+  --sidebar-border: rgba(245, 240, 232, 0.11);
+  --sidebar-ring: #D4A24C;
 }
 
 @layer base {
@@ -126,7 +140,17 @@
   }
   html {
     @apply font-sans;
+    /* The heading serif defaults to old-style figures; IDs and ratings need lining ones. */
+    font-feature-settings: "lnum";
   }
+}
+
+/* Page heading: the one large serif line at the top of each screen. */
+@utility page-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: clamp(2.625rem, 8vw, 4rem);
+  line-height: 1;
 }
 /*
  * Stacked tables on phones (see the `stack` prop on <Table>).

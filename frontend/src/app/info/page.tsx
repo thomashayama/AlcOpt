@@ -4,7 +4,13 @@ import { Suspense, useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { theme } from '@/lib/theme';
+import {
+  chartAxisLine,
+  chartAxisTitle,
+  chartTick,
+  chartTooltipStyle,
+  theme,
+} from '@/lib/theme';
 import type { ContainerInfoResponse } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +30,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Legend,
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
@@ -97,11 +104,11 @@ function InfoPage() {
   const ingredients = data?.ingredients ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-8 sm:space-y-8 md:py-8">
-      <h1 className="text-2xl font-bold sm:text-3xl">Container Information</h1>
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pt-2 pb-12 md:px-5 md:pt-11 md:pb-16">
+      <h1 className="page-title">Container Information</h1>
 
       {/* Lookup form */}
-      <form onSubmit={handleSubmit} className="flex items-end justify-center gap-4">
+      <form onSubmit={handleSubmit} className="flex items-end gap-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor="container-id">Container ID</Label>
           <Input
@@ -130,7 +137,9 @@ function InfoPage() {
       {data && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-bold sm:text-2xl">Container #{data.container.id}</h2>
+            <h2 className="font-heading text-3xl leading-tight font-semibold sm:text-4xl">
+              Container #{data.container.id}
+            </h2>
             <Link href={`/tasting?container_id=${data.container.id}`}>
               <Button>Submit Review</Button>
             </Link>
@@ -259,65 +268,54 @@ function InfoPage() {
                 <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={sgChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(245,240,232,0.1)" />
+                      <CartesianGrid vertical={false} stroke={theme.grid} />
                       <XAxis
                         dataKey="days"
-                        label={{
-                          value: 'Days from Start',
-                          position: 'insideBottom',
-                          offset: -5,
-                          fill: theme.text,
-                        }}
-                        tick={{ fill: theme.text }}
+                        label={chartAxisTitle('Days from Start', 'bottom')}
+                        tick={chartTick}
+                        axisLine={chartAxisLine}
+                        tickLine={false}
                       />
                       <YAxis
                         yAxisId="sg"
                         domain={['auto', 'auto']}
-                        label={{
-                          value: 'Specific Gravity',
-                          angle: -90,
-                          position: 'insideLeft',
-                          fill: '#6B9BD2',
-                        }}
-                        tick={{ fill: '#6B9BD2' }}
+                        label={chartAxisTitle('Specific Gravity', 'left')}
+                        tick={chartTick}
+                        axisLine={false}
+                        tickLine={false}
                       />
                       <YAxis
                         yAxisId="abv"
                         orientation="right"
                         domain={[0, 'auto']}
-                        label={{
-                          value: 'ABV %',
-                          angle: 90,
-                          position: 'insideRight',
-                          fill: theme.primary,
-                        }}
-                        tick={{ fill: theme.primary }}
+                        label={chartAxisTitle('ABV %', 'right')}
+                        tick={chartTick}
+                        axisLine={false}
+                        tickLine={false}
                       />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: theme.surface,
-                          border: `1px solid ${theme.primary}`,
-                          color: theme.text,
-                          borderRadius: 8,
-                        }}
+                      <Tooltip contentStyle={chartTooltipStyle} cursor={{ stroke: theme.axis }} />
+                      <Legend
+                        verticalAlign="top"
+                        height={32}
+                        formatter={(value) => <span style={{ color: theme.muted }}>{value}</span>}
                       />
                       <Line
                         yAxisId="sg"
                         type="monotone"
                         dataKey="sg"
-                        stroke="#6B9BD2"
+                        stroke={theme.gold}
                         strokeWidth={2}
                         name="Specific Gravity"
-                        dot={{ fill: '#6B9BD2', r: 4 }}
+                        dot={{ fill: theme.gold, stroke: theme.card, strokeWidth: 2, r: 4 }}
                       />
                       <Line
                         yAxisId="abv"
                         type="monotone"
                         dataKey="abv"
-                        stroke={theme.primary}
+                        stroke={theme.wine}
                         strokeWidth={2}
                         name="ABV %"
-                        dot={{ fill: theme.primary, r: 4 }}
+                        dot={{ fill: theme.wine, stroke: theme.card, strokeWidth: 2, r: 4 }}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
